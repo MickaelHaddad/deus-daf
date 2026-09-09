@@ -1,0 +1,73 @@
+# =====================================================================
+#  deus-daf — .htaccess SANS redirection HTTPS
+# =====================================================================
+#  À utiliser quand l'hébergeur force déjà le HTTPS en amont.
+#
+#      cp deploy/htaccess-sans-redirection.sample .htaccess
+#
+#  Pourquoi cette variante : si le TLS est terminé par un proxy qui
+#  transmet ensuite la requête en clair à Apache sans en-tête
+#  X-Forwarded-Proto, la règle de redirection HTTPS se déclenche à
+#  chaque passage. Le navigateur repart en HTTPS, le proxy retransmet en
+#  clair, et ainsi de suite : « ERR_TOO_MANY_REDIRECTS ».
+#
+#  Retirer la règle est ici sans risque : c'est l'hébergeur qui garantit
+#  le HTTPS, et l'application envoie de toute façon l'en-tête
+#  Strict-Transport-Security dès qu'elle détecte une requête sécurisée.
+#
+#  Protections identiques par ailleurs, toutes en mod_rewrite, donc
+#  compatibles avec un AllowOverride limité à FileInfo.
+# =====================================================================
+#  À utiliser UNIQUEMENT si le .htaccess standard provoque une erreur
+#  500, ce qui arrive quand l'hébergeur limite « AllowOverride » :
+#
+#      cp deploy/htaccess-restricted.sample .htaccess
+#
+#  Différence avec le fichier standard : toutes les protections passent
+#  par mod_rewrite, qui ne demande que « AllowOverride FileInfo ». Les
+#  directives « Options » et « Require » en sont absentes, car elles
+#  exigent respectivement « AllowOverride Options » et « AllowOverride
+#  AuthConfig », souvent refusés en mutualisé — et une directive
+#  refusée met en erreur 500 la totalité du répertoire.
+#
+#  Le niveau de protection est équivalent. Seule différence pratique :
+#  le listage des dossiers n'est pas désactivé ici, faute de pouvoir
+#  écrire « Options -Indexes ». Les dossiers sensibles restant bloqués
+#  par les règles ci-dessous, l'exposition se limite à assets/.
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # -----------------------------------------------------------------
+    # Dossiers applicatifs : schéma SQL, journaux, sessions, scripts.
+    # -----------------------------------------------------------------
+    RewriteRule ^(storage|db|bin|deploy)(/|$) - [F,L]
+
+    # -----------------------------------------------------------------
+    # Includes : jamais appelés directement.
+    # -----------------------------------------------------------------
+    RewriteRule ^inc_ - [F,L]
+
+    # -----------------------------------------------------------------
+    # Fichiers cachés et sauvegardes d'éditeur.
+    # -----------------------------------------------------------------
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule ~$ - [F,L]
+
+    # -----------------------------------------------------------------
+    # Extensions qui n'ont rien à faire sur le web.
+    # « json » est volontairement absent : assets/ en contient.
+    # -----------------------------------------------------------------
+    RewriteRule \.(sql|log|md|sample|bak|dist|ini|sh|lock|yml|yaml|swp|orig|rej)$ - [F,L]
+
+</IfModule>
+
+# ---------------------------------------------------------------------
+# En-têtes de sécurité — mod_headers relève aussi de FileInfo.
+# ---------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "same-origin"
+</IfModule>

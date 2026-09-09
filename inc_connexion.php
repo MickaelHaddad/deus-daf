@@ -73,6 +73,103 @@ ini_set('error_log', $logDir . '/php-error.log');
 date_default_timezone_set($config['app']['timezone'] ?? 'Europe/Paris');
 
 // ---------------------------------------------------------------------
+// Gestion des erreurs fatales
+// ---------------------------------------------------------------------
+// Sans ces gestionnaires, une erreur fatale en production produit une
+// page parfaitement blanche : ni message, ni indice, ni moyen de relier
+// ce qu'a vu l'utilisateur à une ligne du journal. On produit donc
+// toujours quelque chose de lisible, avec une référence permettant de
+// retrouver la trace complète dans storage/logs/php-error.log.
+
+/**
+ * Affiche une erreur fatale, en JSON ou en HTML selon ce qu'attend
+ * l'appelant. Volontairement sans aucune dépendance : cette fonction
+ * doit fonctionner même si le reste de l'application n'a pas pu être
+ * chargé.
+ */
+function daf_fatal(string $technique): void
+{
+    $isProd = (($GLOBALS['config']['env'] ?? 'production') === 'production');
+
+    // Référence courte, journalisée puis affichée : elle relie l'écran
+    // de l'utilisateur à la ligne exacte du journal.
+    $reference = strtoupper(bin2hex(random_bytes(3)));
+
+    error_log('[DEUS-DAF][' . $reference . '] ' . $technique);
+
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
+    if (!headers_sent()) {
+        http_response_code(500);
+    }
+
+    // Une requête AJAX attend du JSON : lui renvoyer du HTML produirait
+    // un « réponse inattendue du serveur » sans aucune information.
+    $attendJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+        || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+
+    $message = $isProd
+        ? "Une erreur technique est survenue (référence {$reference})."
+        : $technique;
+
+    if ($attendJson) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'success'   => false,
+            'data'      => null,
+            'message'   => $message,
+            'errors'    => null,
+            'reference' => $reference,
+        ], JSON_UNESCAPED_UNICODE);
+
+        return;
+    }
+
+    if (!headers_sent()) {
+        header('Content-Type: text/html; charset=utf-8');
+    }
+
+    echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+       . '<title>Erreur technique</title></head><body>'
+       . '<h1>Erreur technique</h1><p>'
+       . htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+       . '</p>';
+
+    if ($isProd) {
+        echo '<p>Le détail a été enregistré dans le journal du serveur sous la '
+           . 'référence <strong>' . $reference . '</strong>.</p>';
+    }
+
+    echo '</body></html>';
+}
+
+// Exceptions non rattrapées.
+set_exception_handler(static function (Throwable $e): void {
+    daf_fatal(
+        get_class($e) . ' : ' . $e->getMessage()
+        . ' — ' . $e->getFile() . ':' . $e->getLine()
+    );
+});
+
+// Erreurs fatales et erreurs d'analyse survenues dans un fichier inclus.
+register_shutdown_function(static function (): void {
+    $erreur = error_get_last();
+
+    if ($erreur === null) {
+        return;
+    }
+    if (!in_array($erreur['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        return;
+    }
+
+    daf_fatal($erreur['message'] . ' — ' . $erreur['file'] . ':' . $erreur['line']);
+});
+
+// ---------------------------------------------------------------------
 // Base de données et fonctions communes
 // ---------------------------------------------------------------------
 require_once DEUS_DAF_ROOT . '/inc_bdd.php';        // définit $sql
@@ -99,8 +196,19 @@ $GLOBALS['session_expired'] = false;
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
     $sessionCfg = $config['session'];
 
+    // -----------------------------------------------------------------
+    // Emplacement de stockage des sessions
+    // -----------------------------------------------------------------
+    // On n'impose un dossier QUE si l'hébergeur utilise le gestionnaire
+    // « files ». Beaucoup de serveurs mutualisés stockent les sessions
+    // dans memcached ou redis : pour ces gestionnaires, session.save_path
+    // attend une adresse de serveur (« localhost:11211 »), pas un
+    // répertoire. Y écrire un chemin de fichier empêche purement et
+    // simplement la création de toute session.
     $savePath = $sessionCfg['save_path'] ?? '';
-    if ($savePath !== '') {
+    $handler  = strtolower((string) ini_get('session.save_handler'));
+
+    if ($savePath !== '' && $handler === 'files') {
         if (!is_dir($savePath)) {
             @mkdir($savePath, 0770, true);
         }

@@ -112,7 +112,7 @@ try {
  * Enregistre la préférence de thème de l'utilisateur courant.
  * Appelée silencieusement par theme-modes.js à chaque bascule.
  */
-function action_profil_theme(): never
+function action_profil_theme()
 {
     global $sql;
 
@@ -135,7 +135,7 @@ function action_profil_theme(): never
  * L'ancien mot de passe est exigé : sans lui, un poste laissé ouvert
  * suffirait à verrouiller le compte de son propriétaire.
  */
-function action_profil_password(): never
+function action_profil_password()
 {
     global $sql;
 
@@ -187,7 +187,7 @@ function action_profil_password(): never
  * Création ou modification d'un utilisateur.
  * Un compte n'est jamais supprimé : il est désactivé.
  */
-function action_utilisateur_save(): never
+function action_utilisateur_save()
 {
     global $sql;
 
@@ -344,7 +344,7 @@ function action_utilisateur_save(): never
 }
 
 /** Activation ou désactivation d'un compte (jamais de suppression). */
-function action_utilisateur_toggle(): never
+function action_utilisateur_toggle()
 {
     global $sql;
 
@@ -406,7 +406,7 @@ function action_utilisateur_toggle(): never
  * base. Le statut « expirée » n'est pas saisissable : il se déduit de
  * la date d'expiration à chaque lecture.
  */
-function action_carte_save(): never
+function action_carte_save()
 {
     global $sql;
 
@@ -536,7 +536,7 @@ function action_carte_save(): never
  * Refusée dès qu'un service la référence, quel que soit son statut :
  * la clé étrangère est en RESTRICT et l'historique doit rester lisible.
  */
-function action_carte_delete(): never
+function action_carte_delete()
 {
     global $sql;
 
@@ -583,7 +583,7 @@ function action_carte_delete(): never
  * régénérés par le serveur : le navigateur n'a rien à recalculer, donc
  * l'affichage ne peut pas diverger de la base.
  */
-function action_service_save(): never
+function action_service_save()
 {
     global $sql;
 
@@ -742,7 +742,7 @@ function action_service_save(): never
  * Rien ne l'empêche techniquement, mais l'interface pousse d'abord vers
  * le statut « résilié », qui conserve la trace de la dépense passée.
  */
-function action_service_delete(): never
+function action_service_delete()
 {
     global $sql;
 
@@ -776,7 +776,7 @@ function action_service_delete(): never
  * Chaque valeur est bornée : un seuil aberrant rendrait le bloc
  * d'alertes inutilisable, soit vide, soit saturé.
  */
-function action_reglages_save(): never
+function action_reglages_save()
 {
     global $sql;
 

@@ -1,2 +1,10 @@
 # Aucun fichier de ce dossier ne doit être servi par le serveur web.
-Require all denied
+#
+# Le blocage passe par mod_rewrite et non par « Require all denied » :
+# cette dernière directive exige « AllowOverride AuthConfig », souvent
+# refusé en hébergement mutualisé, et une directive refusée met en
+# erreur 500 la totalité du répertoire.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^ - [F,L]
+</IfModule>

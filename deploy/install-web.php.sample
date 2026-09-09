@@ -1,0 +1,237 @@
+<?php
+/**
+ * ---------------------------------------------------------------------
+ * Création du premier administrateur — version web TEMPORAIRE
+ * ---------------------------------------------------------------------
+ * Pour les hébergements sans accès SSH, où bin/install.php ne peut pas
+ * être lancé.
+ *
+ *  MODE D'EMPLOI
+ *  1. Copier ce fichier À LA RACINE du site, sous le nom
+ *     « creation-admin.php ».
+ *  2. L'ouvrir et renseigner CLE_ACCES ci-dessous.
+ *  3. Ouvrir https://votre-site/creation-admin.php?cle=VOTRE_CLE
+ *  4. SUPPRIMER le fichier une fois le compte créé.
+ *
+ *  Deux garde-fous : une clé secrète est exigée, et le script REFUSE de
+ *  s'exécuter dès qu'un administrateur actif existe en base. La fenêtre
+ *  d'exposition se referme donc d'elle-même après le premier usage.
+ * ---------------------------------------------------------------------
+ */
+
+declare(strict_types=1);
+
+// =====================================================================
+//  ↓↓↓  METTRE ICI UNE VALEUR LONGUE ET ALÉATOIRE  ↓↓↓
+// =====================================================================
+const CLE_ACCES = '';
+// =====================================================================
+
+$racine = __DIR__;
+
+/** Page minimale, sans dépendance à l'application. */
+function page(string $titre, string $corps, int $code = 200): void
+{
+    http_response_code($code);
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Robots-Tag: noindex, nofollow');
+
+    echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+       . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+       . '<title>' . htmlspecialchars($titre, ENT_QUOTES, 'UTF-8') . '</title><style>'
+       . 'body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+       . 'margin:0;padding:24px;background:#f6f7f9;color:#1c1e21;line-height:1.55}'
+       . 'main{max-width:560px;margin:0 auto}h1{font-size:1.3rem;margin:0 0 16px}'
+       . 'label{display:block;font-weight:600;font-size:.88rem;margin:14px 0 4px}'
+       . 'input,select{width:100%;padding:9px 10px;border:1px solid #c9ccd1;border-radius:5px;'
+       . 'font-size:.95rem;box-sizing:border-box;background:#fff}'
+       . 'button{margin-top:20px;width:100%;padding:11px;border:0;border-radius:5px;'
+       . 'background:#007AFF;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}'
+       . 'form{background:#fff;border:1px solid #d8dbe0;border-radius:8px;padding:22px}'
+       . '.box{padding:14px 16px;border-radius:6px;margin:16px 0;font-size:.92rem}'
+       . '.ok{background:#e8f5ec;border:1px solid #9bd4ad}'
+       . '.ko{background:#fdecea;border:1px solid #f0a9a2}'
+       . '.warn{background:#fff4e5;border:1px solid #f0c48a}'
+       . '.err{color:#b42318;font-size:.85rem;margin-top:4px}'
+       . '.aide{color:#61656b;font-size:.82rem;margin-top:4px}'
+       . 'code{background:#eceef1;padding:1px 5px;border-radius:3px;font-size:.88em}'
+       . '.fix{margin:8px 0;padding:10px;background:#f3f4f6;border-radius:4px;'
+       . 'font-family:ui-monospace,Consolas,monospace;font-size:.82rem;white-space:pre-wrap}'
+       . '</style></head><body><main>' . $corps . '</main></body></html>';
+}
+
+// ---------------------------------------------------------------------
+// Garde d'accès
+// ---------------------------------------------------------------------
+if (CLE_ACCES === '') {
+    $suggestion = bin2hex(random_bytes(16));
+
+    page("Création d'administrateur — configuration requise",
+        '<h1>Une clé d\'accès est requise</h1>'
+        . '<p>Ouvrez <code>' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8')
+        . '</code> et remplacez :</p><div class="fix">const CLE_ACCES = \'\';</div>'
+        . '<p>par :</p><div class="fix">const CLE_ACCES = \'' . $suggestion . '\';</div>'
+        . '<p>Puis ouvrez :</p><div class="fix">'
+        . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8') . '?cle=' . $suggestion . '</div>'
+        . '<div class="box warn">Sans cette clé, n\'importe qui pourrait se créer un compte '
+        . 'administrateur sur votre outil.</div>',
+        403
+    );
+    exit;
+}
+
+if (!hash_equals(CLE_ACCES, (string) ($_GET['cle'] ?? ''))) {
+    http_response_code(404);
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Chargement de l'application
+// ---------------------------------------------------------------------
+if (!is_file($racine . '/inc_config.php')) {
+    page('Création d\'administrateur',
+        '<h1>Configuration absente</h1>'
+        . '<p>Copiez <code>inc_config.sample.php</code> en <code>inc_config.php</code> '
+        . 'et renseignez-le avant d\'utiliser ce script.</p>', 500);
+    exit;
+}
+
+define('DEUS_DAF', true);
+
+$config = require $racine . '/inc_config.php';
+$GLOBALS['config'] = $config;
+
+date_default_timezone_set($config['app']['timezone'] ?? 'Europe/Paris');
+
+require_once $racine . '/inc_fonctions.php';
+require_once $racine . '/inc_securite.php';
+require_once $racine . '/inc_bdd.php';   // définit $sql
+
+$GLOBALS['sql'] = $sql;
+
+// ---------------------------------------------------------------------
+// Refus si un administrateur actif existe déjà
+// ---------------------------------------------------------------------
+$existants = (int) $sql->query(
+    "SELECT COUNT(*) FROM fi_users WHERE role = 'admin' AND is_active = 1"
+)->fetchColumn();
+
+if ($existants > 0) {
+    page('Création d\'administrateur',
+        '<h1>Un administrateur existe déjà</h1>'
+        . '<div class="box ok">' . $existants . ' compte(s) administrateur actif(s) en base. '
+        . 'Ce script ne sert qu\'à la toute première installation.</div>'
+        . '<div class="box ko"><strong>Supprimez ce fichier du serveur maintenant</strong> '
+        . '(<code>' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8') . '</code>). '
+        . 'Les comptes suivants se créent depuis le menu Utilisateurs de l\'application.</div>'
+        . '<p><a href="index.php">Aller à la page de connexion</a></p>');
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Traitement du formulaire
+// ---------------------------------------------------------------------
+$erreurs = [];
+$valeurs = [
+    'first_name' => '',
+    'last_name'  => '',
+    'email'      => '',
+    'staff_type' => 'director',
+];
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $valeurs['first_name'] = post_string('first_name', 80);
+    $valeurs['last_name']  = post_string('last_name', 80);
+    $valeurs['email']      = mb_strtolower(post_string('email', 190));
+    $valeurs['staff_type'] = post_enum('staff_type', ['director', 'collaborator']) ?? 'director';
+
+    $motDePasse   = (string) ($_POST['password'] ?? '');
+    $confirmation = (string) ($_POST['password_confirm'] ?? '');
+
+    if ($valeurs['first_name'] === '') {
+        $erreurs['first_name'] = 'Le prénom est obligatoire.';
+    }
+    if ($valeurs['last_name'] === '') {
+        $erreurs['last_name'] = 'Le nom est obligatoire.';
+    }
+    if ($valeurs['email'] === '' || !filter_var($valeurs['email'], FILTER_VALIDATE_EMAIL)) {
+        $erreurs['email'] = "Adresse email invalide.";
+    }
+
+    $probleme = password_problem($motDePasse);
+    if ($probleme !== null) {
+        $erreurs['password'] = $probleme;
+    }
+    if (!hash_equals($motDePasse, $confirmation)) {
+        $erreurs['password_confirm'] = 'Les deux saisies ne correspondent pas.';
+    }
+
+    if ($erreurs === []) {
+        $stmt = $sql->prepare(
+            'INSERT INTO fi_users (first_name, last_name, email, password_hash, role, staff_type, is_active)
+             VALUES (?, ?, ?, ?, \'admin\', ?, 1)'
+        );
+        $stmt->execute([
+            $valeurs['first_name'],
+            $valeurs['last_name'],
+            $valeurs['email'],
+            hash_password($motDePasse),
+            $valeurs['staff_type'],
+        ]);
+
+        $nouvelId = (int) $sql->lastInsertId();
+        log_activity('create', 'user', $nouvelId, $valeurs['email'],
+            ['role' => ['from' => null, 'to' => 'admin']], $nouvelId);
+
+        page('Compte administrateur créé',
+            '<h1>Compte créé</h1>'
+            . '<div class="box ok"><strong>' . h($valeurs['first_name'] . ' ' . $valeurs['last_name'])
+            . '</strong><br>' . h($valeurs['email']) . '<br>'
+            . 'Hachage : ' . (defined('PASSWORD_ARGON2ID') ? 'Argon2id' : 'bcrypt') . '</div>'
+            . '<div class="box ko"><strong>À faire immédiatement :</strong> supprimer le fichier '
+            . '<code>' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8') . '</code> '
+            . 'du serveur.</div>'
+            . '<p><a href="index.php">Se connecter</a></p>');
+        exit;
+    }
+}
+
+// ---------------------------------------------------------------------
+// Formulaire
+// ---------------------------------------------------------------------
+$champ = static function (string $nom, string $libelle, string $type, array $valeurs, array $erreurs, string $aide = ''): string {
+    $html = '<label for="' . $nom . '">' . h($libelle) . '</label>'
+        . '<input type="' . $type . '" id="' . $nom . '" name="' . $nom . '" '
+        . ($type === 'password' ? 'autocomplete="new-password"' : 'value="' . h($valeurs[$nom] ?? '') . '"')
+        . '>';
+
+    if ($aide !== '') {
+        $html .= '<div class="aide">' . h($aide) . '</div>';
+    }
+    if (isset($erreurs[$nom])) {
+        $html .= '<div class="err">' . h($erreurs[$nom]) . '</div>';
+    }
+
+    return $html;
+};
+
+$minimum = (int) ($config['security']['password_min_length'] ?? 12);
+
+$corps = '<h1>Premier compte administrateur</h1>'
+    . '<div class="box warn">La base ne contient aucun administrateur. Ce formulaire crée '
+    . 'le premier — puis ce fichier devra être supprimé du serveur.</div>'
+    . '<form method="post" action="?cle=' . urlencode(CLE_ACCES) . '">'
+    . $champ('first_name', 'Prénom', 'text', $valeurs, $erreurs)
+    . $champ('last_name', 'Nom', 'text', $valeurs, $erreurs)
+    . $champ('email', 'Adresse email', 'email', $valeurs, $erreurs, "Sert d'identifiant de connexion.")
+    . '<label for="staff_type">Position</label><select id="staff_type" name="staff_type">'
+    . '<option value="director"' . ($valeurs['staff_type'] === 'director' ? ' selected' : '') . '>Dirigeant</option>'
+    . '<option value="collaborator"' . ($valeurs['staff_type'] === 'collaborator' ? ' selected' : '') . '>Collaborateur</option>'
+    . '</select>'
+    . $champ('password', 'Mot de passe', 'password', $valeurs, $erreurs,
+        $minimum . ' caractères minimum, avec majuscules, minuscules et chiffres.')
+    . $champ('password_confirm', 'Confirmation', 'password', $valeurs, $erreurs)
+    . '<button type="submit">Créer le compte administrateur</button>'
+    . '</form>';
+
+page('Premier compte administrateur — Deus DAF', $corps);

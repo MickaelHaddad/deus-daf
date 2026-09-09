@@ -60,8 +60,38 @@ CREATE TABLE `fi_users` (
   COMMENT='Utilisateurs de l''outil, titulaires de carte et référents';
 
 -- ---------------------------------------------------------------------
+-- Table : fi_banks
+-- Comptes bancaires de la structure. Une banque appartient à une des
+-- sociétés du groupe et porte une ou plusieurs cartes.
+--
+-- « company » est un VARCHAR et non un ENUM : la liste des sociétés est
+-- tenue côté PHP (fonction companies() dans inc_metier.php) et validée
+-- à l'écriture. Ajouter une société est ainsi une ligne de PHP, sans
+-- ALTER TABLE sur une base partagée avec d'autres applications.
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `fi_banks`;
+CREATE TABLE `fi_banks` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`       VARCHAR(120) NOT NULL                    COMMENT 'Nom de la banque : Qonto, BNP Paribas, Revolut...',
+  `company`    VARCHAR(60)  NOT NULL                    COMMENT 'Société titulaire du compte, validée côté PHP',
+  `notes`      TEXT         DEFAULT NULL                COMMENT 'Commentaire libre : agence, conseiller, IBAN partiel...',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `updated_by` INT UNSIGNED DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  -- Une même banque peut servir plusieurs sociétés : c'est le couple
+  -- qui doit être unique, pas le nom seul.
+  UNIQUE KEY `uq_banks_name_company` (`name`, `company`),
+  KEY `idx_banks_company` (`company`),
+  CONSTRAINT `fk_fi_banks_created_by` FOREIGN KEY (`created_by`) REFERENCES `fi_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_fi_banks_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `fi_users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Comptes bancaires, rattachés à une société du groupe';
+
+-- ---------------------------------------------------------------------
 -- Table : fi_cards
--- Cartes bancaires de la structure.
+-- Cartes bancaires de la structure, rattachées à un compte bancaire.
 -- CONFORMITÉ PCI DSS : aucune colonne ne peut recevoir un PAN complet
 -- ni un CVV/CVC. Seuls les 4 derniers chiffres sont stockés, contraints
 -- à exactement 4 caractères numériques.
@@ -72,7 +102,7 @@ CREATE TABLE `fi_cards` (
   `label`       VARCHAR(120) NOT NULL                   COMMENT 'Libellé lisible, ex. « CB Pro Qonto Mickael »',
   `last4`       CHAR(4)      NOT NULL                   COMMENT '4 derniers chiffres UNIQUEMENT — jamais le numéro complet',
   `expires_on`  DATE         NOT NULL                   COMMENT 'Dernier jour du mois d''expiration : la carte reste valable jusqu''à cette date incluse',
-  `issuer`      VARCHAR(80)  DEFAULT NULL               COMMENT 'Banque ou émetteur (Qonto, BNP, Revolut...)',
+  `bank_id`     INT UNSIGNED NOT NULL                   COMMENT 'Compte bancaire dont dépend la carte (référence fi_banks)',
   `holder_id`   INT UNSIGNED NOT NULL                   COMMENT 'Titulaire de la carte (référence users)',
   `type`        ENUM('debit','credit','virtual','prepaid') NOT NULL DEFAULT 'debit'
                                                         COMMENT 'Débit / crédit / virtuelle / prépayée',
@@ -87,6 +117,8 @@ CREATE TABLE `fi_cards` (
   KEY `idx_cards_expires` (`expires_on`),
   KEY `idx_cards_holder` (`holder_id`),
   KEY `idx_cards_status` (`status`, `expires_on`),
+  KEY `idx_cards_bank` (`bank_id`),
+  CONSTRAINT `fk_fi_cards_bank`       FOREIGN KEY (`bank_id`)    REFERENCES `fi_banks` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_fi_cards_holder`     FOREIGN KEY (`holder_id`)  REFERENCES `fi_users` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_fi_cards_created_by` FOREIGN KEY (`created_by`) REFERENCES `fi_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_fi_cards_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `fi_users` (`id`) ON DELETE SET NULL,

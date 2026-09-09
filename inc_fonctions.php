@@ -57,7 +57,7 @@ function json_response(
     ?string $message = null,
     ?array $errors = null,
     int $status = 200
-): never {
+) {
     // Toute sortie parasite antérieure (notice PHP, espace en trop dans
     // un include) rendrait le JSON illisible par le client : on vide le
     // tampon avant d'écrire, en la journalisant pour ne pas la perdre.
@@ -85,13 +85,13 @@ function json_response(
 }
 
 /** Raccourci : réponse de succès. */
-function json_ok(mixed $data = null, ?string $message = null, int $status = 200): never
+function json_ok(mixed $data = null, ?string $message = null, int $status = 200)
 {
     json_response(true, $data, $message, null, $status);
 }
 
 /** Raccourci : réponse d'échec. */
-function json_error(string $message, ?array $errors = null, int $status = 400): never
+function json_error(string $message, ?array $errors = null, int $status = 400)
 {
     json_response(false, null, $message, $errors, $status);
 }
@@ -219,7 +219,7 @@ function base_path(): string
  * chemin fantaisiste dès que la requête ne correspond pas à un fichier
  * réel — et peut boucler.
  */
-function redirect_to(string $page): never
+function redirect_to(string $page)
 {
     header('Location: ' . base_path() . '/' . ltrim($page, '/'));
     exit;

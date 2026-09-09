@@ -82,6 +82,15 @@ return [
 
         // Dossier des fichiers de session, isolé du /tmp partagé du
         // serveur. Doit être accessible en écriture par PHP.
+        //
+        // Ce réglage n'est appliqué QUE si l'hébergeur utilise le
+        // gestionnaire de sessions « files ». Beaucoup de serveurs
+        // mutualisés stockent les sessions dans memcached ou redis : ces
+        // gestionnaires attendent une adresse de serveur dans
+        // session.save_path, pas un répertoire, et y écrire un chemin de
+        // dossier empêche toute création de session. L'application
+        // détecte le cas et laisse alors la configuration de l'hébergeur
+        // intacte.
         'save_path' => __DIR__ . '/storage/sessions',
     ],
 

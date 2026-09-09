@@ -1,0 +1,124 @@
+<?php
+/**
+ * ---------------------------------------------------------------------
+ * version.php — quelle version de PHP sert réellement ce site ?
+ * ---------------------------------------------------------------------
+ * Ce fichier est écrit en syntaxe PHP 5.2 : pas de tableaux courts, pas
+ * de typage, pas de fonctions fléchées, pas d'opérateur ??. Il s'exécute
+ * donc sur absolument n'importe quelle version de PHP, ce qui est tout
+ * l'intérêt quand les autres scripts renvoient une erreur 500.
+ *
+ *  MODE D'EMPLOI
+ *  1. Copier ce fichier à la racine du site, sous le nom « version.php ».
+ *  2. Ouvrir https://votre-site/version.php
+ *  3. SUPPRIMER le fichier ensuite.
+ *
+ * Il n'affiche ni chemin absolu, ni configuration, ni mot de passe.
+ * ---------------------------------------------------------------------
+ */
+
+header('Content-Type: text/html; charset=utf-8');
+header('X-Robots-Tag: noindex, nofollow');
+
+$version   = PHP_VERSION;
+$sapi      = PHP_SAPI;
+$suffisant = version_compare($version, '8.0.0', '>=');
+$ideal     = version_compare($version, '8.2.0', '>=');
+
+$extensions = array('pdo', 'pdo_mysql', 'mbstring', 'json', 'session');
+$manquantes = array();
+
+foreach ($extensions as $extension) {
+    if (!extension_loaded($extension)) {
+        $manquantes[] = $extension;
+    }
+}
+
+$dossier = dirname(__FILE__);
+
+echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">';
+echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+echo '<title>Version de PHP</title><style>';
+echo 'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;';
+echo 'margin:0;padding:24px;background:#f6f7f9;color:#1c1e21;line-height:1.55}';
+echo 'main{max-width:760px;margin:0 auto}h1{font-size:1.3rem;margin:0 0 16px}';
+echo '.v{font-size:2.2rem;font-weight:700;margin:8px 0}';
+echo '.box{padding:14px 16px;border-radius:6px;margin:16px 0}';
+echo '.ok{background:#e8f5ec;border:1px solid #9bd4ad}';
+echo '.ko{background:#fdecea;border:1px solid #f0a9a2}';
+echo '.warn{background:#fff4e5;border:1px solid #f0c48a}';
+echo 'table{width:100%;border-collapse:collapse;background:#fff;';
+echo 'border:1px solid #d8dbe0;border-radius:6px;margin:16px 0}';
+echo 'td{padding:7px 10px;border-top:1px solid #eceef1;font-size:.9rem}';
+echo 'tr:first-child td{border-top:0}td:first-child{width:230px;color:#61656b}';
+echo 'code{background:#eceef1;padding:1px 5px;border-radius:3px}';
+echo '</style></head><body><main>';
+
+echo '<h1>Version de PHP servie par ce site</h1>';
+echo '<div class="v">PHP ' . htmlspecialchars($version) . '</div>';
+
+if (!$suffisant) {
+    echo '<div class="box ko"><strong>C\'est la cause de l\'erreur 500.</strong><br>';
+    echo 'Deus DAF exige <strong>PHP 8.0 minimum</strong> (8.2 recommandé). ';
+    echo 'Sur cette version, plusieurs fichiers de l\'application ne peuvent même pas ';
+    echo 'être analysés : PHP s\'arrête avant d\'exécuter la moindre ligne, ce qui ';
+    echo 'produit une page 500 sans aucun message.<br><br>';
+    echo 'La plupart des hébergeurs permettent de choisir la version de PHP par site ';
+    echo 'ou par dossier, depuis le panneau d\'administration. C\'est le réglage à ';
+    echo 'modifier.</div>';
+} elseif (!$ideal) {
+    echo '<div class="box warn">Version suffisante pour faire tourner l\'application, ';
+    echo 'mais 8.2 reste recommandé. L\'erreur 500 vient d\'ailleurs.</div>';
+} else {
+    echo '<div class="box ok">Version conforme. L\'erreur 500 vient d\'ailleurs : ';
+    echo 'utilisez le diagnostic complet (diagnostic.php).</div>';
+}
+
+echo '<table>';
+echo '<tr><td>Interface PHP</td><td><code>' . htmlspecialchars($sapi) . '</code></td></tr>';
+echo '<tr><td>Version requise</td><td>8.0 minimum, 8.2 recommandé</td></tr>';
+
+echo '<tr><td>Extensions requises</td><td>';
+if (count($manquantes) === 0) {
+    echo 'toutes présentes';
+} else {
+    echo '<strong>manquantes : ' . htmlspecialchars(implode(', ', $manquantes)) . '</strong>';
+}
+echo '</td></tr>';
+
+echo '<tr><td>Affichage des erreurs</td><td>';
+echo (ini_get('display_errors') ? 'activé' : 'désactivé');
+echo '</td></tr>';
+
+echo '<tr><td>Journal des erreurs PHP</td><td><code>';
+$journal = ini_get('error_log');
+echo htmlspecialchars($journal ? $journal : '(journal du serveur web)');
+echo '</code></td></tr>';
+
+echo '<tr><td>Fichiers de l\'application</td><td>';
+echo (is_file($dossier . '/inc_connexion.php') ? 'présents' : '<strong>inc_connexion.php introuvable</strong>');
+echo '</td></tr>';
+
+echo '<tr><td>.htaccess à la racine</td><td>';
+echo (is_file($dossier . '/.htaccess') ? 'présent' : 'absent');
+echo '</td></tr>';
+
+echo '</table>';
+
+// Dernières erreurs enregistrées par l'application, si elles existent.
+$journalApp = $dossier . '/storage/logs/php-error.log';
+
+if (is_file($journalApp) && is_readable($journalApp) && filesize($journalApp) > 0) {
+    $contenu = file($journalApp);
+    $extrait = array_slice($contenu, -12);
+
+    echo '<h1 style="font-size:1.05rem;margin-top:28px">Dernières erreurs enregistrées</h1>';
+    echo '<div class="box warn" style="font-family:monospace;font-size:.78rem;white-space:pre-wrap">';
+    echo htmlspecialchars(implode('', $extrait));
+    echo '</div>';
+}
+
+echo '<div class="box warn"><strong>À faire maintenant :</strong> supprimer ce fichier ';
+echo '(<code>version.php</code>) du serveur.</div>';
+
+echo '</main></body></html>';

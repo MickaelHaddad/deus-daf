@@ -26,7 +26,7 @@ vont tomber en panne de paiement quand une carte expire**.
 
 | Composant | Version | Remarque |
 |---|---|---|
-| PHP | 8.2 ou plus | extensions `pdo_mysql`, `mbstring`, `json`, `session` |
+| PHP | 8.2 recommandé, **8.0 minimum** | extensions `pdo_mysql`, `mbstring`, `json`, `session` |
 | MySQL | 8.0 ou plus | MariaDB 10.6+ convient, sauf pour la colonne `JSON` du journal |
 | Apache | 2.4 | modules `rewrite`, `headers`, `expires`, `ssl`, `proxy_fcgi` |
 | — ou Nginx | 1.18 ou plus | voir `deploy/nginx.conf.sample` |
@@ -102,6 +102,21 @@ nano inc_config.php
 ```bash
 php bin/install.php
 ```
+
+**Sans accès SSH**, utiliser la version web, temporaire :
+
+1. Copier `deploy/install-web.php.sample` **à la racine du site**, sous
+   le nom `creation-admin.php`.
+2. L'ouvrir : il affiche une clé aléatoire à recopier dans le fichier.
+3. Ouvrir `https://votre-site/creation-admin.php?cle=VOTRE_CLE` et
+   remplir le formulaire.
+4. **Supprimer le fichier.**
+
+Deux garde-fous : la clé est obligatoire — sans elle le script répond
+404 — et il refuse de s'exécuter dès qu'un administrateur actif existe
+en base. La fenêtre d'exposition se referme donc d'elle-même après le
+premier usage. Les comptes suivants se créent depuis le menu
+Utilisateurs.
 
 Le script demande prénom, nom, email, position et mot de passe (12
 caractères minimum, majuscules, minuscules et chiffres). La saisie du
@@ -284,15 +299,154 @@ pour l'occasion.
 
 ## 9. Dépannage
 
+### Face à une erreur 500 : la procédure
+
+Une 500 peut venir de trois couches. Les traiter dans cet ordre, de la
+plus probable à la plus rare.
+
+**Étape 1 — lancer le diagnostic.** Il vérifie la version de PHP, les
+extensions, les permissions, la configuration, la base, et **analyse
+tous les fichiers PHP avec la version installée sur le serveur** :
+
+```bash
+cd /var/www/deus-daf
+php bin/diagnostic.php
+```
+
+Ce script est autonome : il fonctionne même si l'amorçage de
+l'application est cassé. S'il signale une erreur d'analyse, la cause est
+trouvée — la version de PHP servie est trop ancienne. **Le code exige
+PHP 8.0 minimum**, 8.2 recommandé.
+
+> Si même le diagnostic renvoie une 500, c'est qu'il ne peut pas être
+> analysé non plus. Copier alors `deploy/version.php.sample` à la racine
+> sous le nom `version.php` : ce fichier est écrit en syntaxe PHP 5.2 et
+> s'exécute sur n'importe quelle version. Il affiche la version servie,
+> les extensions présentes, et les dernières erreurs enregistrées par
+> l'application. **À supprimer après usage.**
+
+**Sans accès SSH**, utiliser la version web, à installer temporairement :
+
+1. Copier `deploy/diagnostic-web.php.sample` **à la racine du site**,
+   sous le nom `diagnostic.php`. Le dossier `deploy/` étant bloqué, le
+   fichier ne serait pas exécutable en y restant.
+2. L'ouvrir et renseigner la constante `CLE_ACCES` — le script affiche
+   une clé toute faite à recopier si on l'appelle sans l'avoir remplie.
+3. Ouvrir `https://votre-site/diagnostic.php?cle=VOTRE_CLE`.
+4. **Supprimer le fichier** une fois le diagnostic terminé.
+
+Sans clé valide, le script répond 404 : il ne révèle même pas son
+existence. Les deux versions partagent les mêmes contrôles
+(`inc_diagnostic.php`), elles ne peuvent donc pas diverger.
+
+La version web ajoute un contrôle impossible en ligne de commande : elle
+interroge le site **par HTTP, sur ses propres URL**, pour vérifier que
+`inc_config.php`, `db/seed.sql` et `storage/logs/php-error.log` sont
+réellement inaccessibles. C'est ce qui distingue « le `.htaccess` est
+présent » de « le `.htaccess` est appliqué ».
+
+> Attention : la version de PHP en ligne de commande n'est pas
+> forcément celle utilisée par le serveur web. Pour connaître la
+> seconde, déposer un fichier `version.php` contenant
+> `<?php echo PHP_VERSION;`, l'ouvrir dans un navigateur, puis
+> **le supprimer**.
+
+**Étape 2 — afficher les erreurs à l'écran.** Dans `inc_config.php` :
+
+```php
+'env' => 'development',
+```
+
+Les erreurs applicatives s'affichent alors en clair, en HTML comme en
+JSON. **Repasser sur `production` une fois le problème résolu.**
+
+Si la page reste blanche, c'est que la panne précède le démarrage de
+l'application. Activer alors l'affichage au niveau de PHP lui-même :
+
+```bash
+cp deploy/user.ini.debug.sample .user.ini
+# … reproduire l'erreur, PHP relit ce fichier au bout de 5 minutes …
+rm .user.ini
+```
+
+**Étape 3 — isoler le serveur web.** Si le diagnostic est au vert et que
+l'erreur persiste, la panne est dans Apache et non dans PHP :
+
+```bash
+tail -50 /var/log/apache2/deus-daf-error.log
+# ou, selon l'hébergement :
+tail -50 /var/log/apache2/error.log
+
+# Test décisif : neutraliser le .htaccess un instant
+mv .htaccess .htaccess.off
+# recharger la page, puis TOUJOURS remettre le fichier :
+mv .htaccess.off .htaccess
+```
+
+Si la page fonctionne sans le `.htaccess`, c'est une directive qu'Apache
+refuse. Le journal d'erreurs le dit explicitement, par exemple
+`Options not allowed here` ou `Require not allowed here`.
+
+**Cause la plus fréquente : un `AllowOverride` limité.** Beaucoup
+d'hébergements n'autorisent que `FileInfo`, ce qui interdit `Options` et
+`Require` — les deux directives présentes dans le `.htaccess` standard.
+Résultat : erreur 500 sur tout le répertoire. Le remède est immédiat :
+
+```bash
+cp deploy/htaccess-restricted.sample .htaccess
+```
+
+Cette variante n'utilise que `mod_rewrite` et offre exactement le même
+niveau de protection (vérifié : les mêmes chemins sensibles renvoient
+403, les mêmes ressources publiques renvoient 200). Seule différence,
+le listage des dossiers n'y est pas désactivé, faute de pouvoir écrire
+`Options -Indexes`.
+
+Autres causes possibles : un module non activé (`a2enmod rewrite headers
+expires`), ou une directive `php_flag` / `php_value` alors que PHP
+tourne en FPM — celle-ci met en erreur 500 **tout** le site. Le
+`.htaccess` livré n'en contient aucune, mais un `.htaccess` situé dans
+un répertoire **parent** peut en contenir : dans une installation en
+sous-répertoire, penser à vérifier aussi les niveaux au-dessus.
+
+### Symptômes courants
+
 | Symptôme | Cause probable |
 |---|---|
 | Erreur 500 sur tout le site | Une directive `php_flag` dans un `.htaccess` alors que PHP tourne en FPM. Le `.htaccess` livré n'en contient aucune. |
 | « Configuration absente » | `inc_config.php` n'a pas été créé à partir du modèle. |
 | « Service momentanément indisponible » | Identifiants MySQL erronés, ou base injoignable. Détail dans `storage/logs/php-error.log`. |
 | Déconnexion immédiate après connexion | `session.secure = true` alors que le site est servi en HTTP, ou `storage/sessions` non accessible en écriture. |
+| `Failed to create session ID: memcached` | L'hébergeur stocke les sessions dans memcached ou redis, et non dans des fichiers. Ces gestionnaires attendent une adresse de serveur dans `session.save_path`, pas un répertoire. L'application détecte ce cas depuis la version actuelle et laisse la configuration de l'hébergeur intacte : mettre `inc_connexion.php` à jour suffit. |
+| Impossible de se connecter, la page revient sans cesse au formulaire | Les sessions ne se créent pas. La section 2 du diagnostic contient un test réel de création de session qui le confirme et nomme le gestionnaire en cause. |
 | Le tableau des services reste vide | Un fichier de `assets/` manque. Vérifier l'onglet Réseau du navigateur : aucune requête ne doit être en 404. |
-| Boucle de redirection | `AllowOverride` absent : la règle HTTPS du `.htaccess` s'applique alors que le vhost redirige déjà. |
+| Boucle de redirection (`ERR_TOO_MANY_REDIRECTS`) | Voir ci-dessous. |
 | Les accents s'affichent mal dans l'export | Ouvrir le CSV avec Excel via *Données → À partir d'un fichier texte*, encodage UTF-8. |
+
+### Boucle de redirection
+
+Le diagnostic contient une section « 8. Contexte de la requête » qui
+tranche la question : elle affiche `SCRIPT_NAME`, le chemin de base
+calculé, le port, la variable `HTTPS` et tous les en-têtes de proxy
+reçus — puis conclut explicitement si la règle HTTPS peut boucler.
+
+La cause habituelle : le TLS est terminé par un proxy en amont qui
+transmet ensuite la requête **en clair** à Apache. Apache ne voit que du
+HTTP, redirige vers HTTPS, le proxy retransmet en clair, et ainsi de
+suite. Le `.htaccess` livré teste sept en-têtes de proxy différents pour
+éviter ce piège, mais certains hébergeurs n'en envoient aucun.
+
+Remède, dans l'ordre :
+
+```bash
+# 1. Un .htaccess qui ne redirige pas du tout — l'hébergeur force déjà le HTTPS
+cp deploy/htaccess-sans-redirection.sample .htaccess
+```
+
+Cette variante a un second effet utile : son `RewriteEngine On` reprend
+la main sur les règles de réécriture d'un `.htaccess` **parent**. Dans
+une installation en sous-répertoire d'un site existant, une boucle vient
+souvent de là.
 
 Journaux utiles :
 

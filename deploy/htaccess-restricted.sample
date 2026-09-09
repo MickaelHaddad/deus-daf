@@ -1,0 +1,73 @@
+# =====================================================================
+#  deus-daf — .htaccess de REPLI pour hébergement restreint
+# =====================================================================
+#  À utiliser UNIQUEMENT si le .htaccess standard provoque une erreur
+#  500, ce qui arrive quand l'hébergeur limite « AllowOverride » :
+#
+#      cp deploy/htaccess-restricted.sample .htaccess
+#
+#  Différence avec le fichier standard : toutes les protections passent
+#  par mod_rewrite, qui ne demande que « AllowOverride FileInfo ». Les
+#  directives « Options » et « Require » en sont absentes, car elles
+#  exigent respectivement « AllowOverride Options » et « AllowOverride
+#  AuthConfig », souvent refusés en mutualisé — et une directive
+#  refusée met en erreur 500 la totalité du répertoire.
+#
+#  Le niveau de protection est équivalent. Seule différence pratique :
+#  le listage des dossiers n'est pas désactivé ici, faute de pouvoir
+#  écrire « Options -Indexes ». Les dossiers sensibles restant bloqués
+#  par les règles ci-dessous, l'exposition se limite à assets/.
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # -----------------------------------------------------------------
+    # Dossiers applicatifs : schéma SQL, journaux, sessions, scripts.
+    # -----------------------------------------------------------------
+    RewriteRule ^(storage|db|bin|deploy)(/|$) - [F,L]
+
+    # -----------------------------------------------------------------
+    # Includes : jamais appelés directement.
+    # -----------------------------------------------------------------
+    RewriteRule ^inc_ - [F,L]
+
+    # -----------------------------------------------------------------
+    # Fichiers cachés et sauvegardes d'éditeur.
+    # -----------------------------------------------------------------
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule ~$ - [F,L]
+
+    # -----------------------------------------------------------------
+    # Extensions qui n'ont rien à faire sur le web.
+    # « json » est volontairement absent : assets/ en contient.
+    # -----------------------------------------------------------------
+    RewriteRule \.(sql|log|md|sample|bak|dist|ini|sh|lock|yml|yaml|swp|orig|rej)$ - [F,L]
+
+    # -----------------------------------------------------------------
+    # Redirection HTTPS, en dernier pour que les blocages s'appliquent
+    # d'abord.
+    # -----------------------------------------------------------------
+    # Chaque condition doit être fausse pour que la redirection ait lieu.
+    # On teste toutes les façons dont un proxy inverse peut signaler que
+    # le visiteur est bien arrivé en HTTPS : en oublier une provoque une
+    # boucle de redirection sans fin.
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{SERVER_PORT} !=443
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{HTTP:X-Forwarded-Protocol} !=https
+    RewriteCond %{HTTP:X-Forwarded-Ssl} !=on
+    RewriteCond %{HTTP:X-Forwarded-Port} !=443
+    RewriteCond %{HTTP:X-Url-Scheme} !=https
+    RewriteCond %{HTTP:Front-End-Https} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ---------------------------------------------------------------------
+# En-têtes de sécurité — mod_headers relève aussi de FileInfo.
+# ---------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "same-origin"
+</IfModule>

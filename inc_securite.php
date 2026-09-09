@@ -75,7 +75,14 @@ function send_security_headers(): void
     }
 }
 
-/** Vrai si la requête courante est en HTTPS (proxy inverse compris). */
+/**
+ * Vrai si la requête courante est en HTTPS, proxy inverse compris.
+ *
+ * Les proxys ne signalent pas tous le HTTPS de la même façon : cette
+ * liste couvre les en-têtes rencontrés en pratique. Elle doit rester
+ * alignée sur les conditions RewriteCond du .htaccess, faute de quoi
+ * l'application et le serveur web se contrediraient.
+ */
 function is_https(): bool
 {
     if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
@@ -85,7 +92,22 @@ function is_https(): bool
         return true;
     }
 
-    return strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    $entetes = [
+        'HTTP_X_FORWARDED_PROTO'    => 'https',
+        'HTTP_X_FORWARDED_PROTOCOL' => 'https',
+        'HTTP_X_FORWARDED_SSL'      => 'on',
+        'HTTP_X_URL_SCHEME'         => 'https',
+        'HTTP_FRONT_END_HTTPS'      => 'on',
+        'HTTP_X_FORWARDED_PORT'     => '443',
+    ];
+
+    foreach ($entetes as $entete => $attendu) {
+        if (strtolower((string) ($_SERVER[$entete] ?? '')) === $attendu) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // =====================================================================

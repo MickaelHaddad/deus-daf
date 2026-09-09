@@ -1,0 +1,170 @@
+<?php
+/**
+ * ---------------------------------------------------------------------
+ * Diagnostic web TEMPORAIRE
+ * ---------------------------------------------------------------------
+ * Pour les hébergements sans accès SSH, où bin/diagnostic.php ne peut
+ * pas être lancé.
+ *
+ *  MODE D'EMPLOI
+ *  1. Copier ce fichier À LA RACINE du site, sous le nom
+ *     « diagnostic.php » (le dossier deploy/ est bloqué par le
+ *     .htaccess, le fichier n'y serait pas exécutable).
+ *  2. Ouvrir le fichier et renseigner CLE_ACCES ci-dessous.
+ *  3. Ouvrir https://votre-site/diagnostic.php?cle=VOTRE_CLE
+ *  4. SUPPRIMER le fichier une fois le diagnostic terminé.
+ *
+ *  ⚠️  Ce script révèle la structure du serveur, les chemins et l'état
+ *  de la base. Il ne divulgue jamais le mot de passe de la base, mais
+ *  il n'a rien à faire en permanence sur un site en production.
+ * ---------------------------------------------------------------------
+ */
+
+declare(strict_types=1);
+
+// =====================================================================
+//  ↓↓↓  METTRE ICI UNE VALEUR LONGUE ET ALÉATOIRE  ↓↓↓
+// =====================================================================
+const CLE_ACCES = '';
+// =====================================================================
+
+/** Page minimale, sans dépendance à l'application. */
+function page(string $titre, string $corps, int $code = 200): never
+{
+    http_response_code($code);
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Robots-Tag: noindex, nofollow');
+
+    echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+       . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+       . '<title>' . htmlspecialchars($titre, ENT_QUOTES, 'UTF-8') . '</title>'
+       . '<style>'
+       . 'body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+       . 'margin:0;padding:24px;background:#f6f7f9;color:#1c1e21;line-height:1.5}'
+       . 'main{max-width:1000px;margin:0 auto}'
+       . 'h1{font-size:1.4rem;margin:0 0 4px}'
+       . 'h2{font-size:1rem;margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid #d8dbe0}'
+       . '.meta{color:#61656b;font-size:.85rem;margin-bottom:8px}'
+       . 'table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #d8dbe0;'
+       . 'border-radius:6px;overflow:hidden}'
+       . 'td{padding:7px 10px;border-top:1px solid #eceef1;vertical-align:top;font-size:.88rem}'
+       . 'tr:first-child td{border-top:0}'
+       . 'td.e{width:78px;font-weight:700;text-align:center;white-space:nowrap}'
+       . 'td.l{width:270px}'
+       . '.ok{color:#1a7f37}.warn{color:#9a6700}.fail{color:#b42318}'
+       . 'tr.fail{background:#fff5f4}tr.warn{background:#fffaf0}'
+       . '.fix{margin:6px 0 0;padding:8px 10px;background:#f3f4f6;border-radius:4px;'
+       . 'font-family:ui-monospace,Consolas,monospace;font-size:.8rem;white-space:pre-wrap}'
+       . '.bilan{margin:24px 0;padding:14px 16px;border-radius:6px;font-weight:600}'
+       . '.bilan.ok{background:#e8f5ec;border:1px solid #9bd4ad}'
+       . '.bilan.ko{background:#fdecea;border:1px solid #f0a9a2}'
+       . '.rappel{margin-top:28px;padding:14px 16px;background:#fff4e5;'
+       . 'border:1px solid #f0c48a;border-radius:6px;font-size:.9rem}'
+       . 'code{background:#eceef1;padding:1px 5px;border-radius:3px;font-size:.85em}'
+       . '</style></head><body><main>' . $corps . '</main></body></html>';
+
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Garde d'accès
+// ---------------------------------------------------------------------
+if (CLE_ACCES === '') {
+    // Aide au démarrage : on propose une clé toute faite à recopier.
+    $suggestion = bin2hex(random_bytes(16));
+
+    page('Diagnostic — configuration requise',
+        '<h1>Une clé d\'accès est requise</h1>'
+        . '<p>Ouvrez <code>' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8')
+        . '</code> et remplacez la ligne&nbsp;:</p>'
+        . '<div class="fix">const CLE_ACCES = \'\';</div>'
+        . '<p>par&nbsp;:</p>'
+        . '<div class="fix">const CLE_ACCES = \'' . $suggestion . '\';</div>'
+        . '<p>Puis ouvrez&nbsp;:</p>'
+        . '<div class="fix">' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8')
+        . '?cle=' . $suggestion . '</div>'
+        . '<div class="rappel">Sans cette clé, n\'importe qui pourrait consulter l\'état '
+        . 'interne de votre serveur. Supprimez ce fichier une fois le diagnostic terminé.</div>',
+        403
+    );
+}
+
+// Clé absente ou fausse : on ne révèle même pas l'existence du script.
+if (!hash_equals(CLE_ACCES, (string) ($_GET['cle'] ?? ''))) {
+    http_response_code(404);
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Exécution des contrôles
+// ---------------------------------------------------------------------
+$racine  = __DIR__;
+$include = $racine . '/inc_diagnostic.php';
+
+if (!is_file($include)) {
+    page('Diagnostic',
+        '<h1>Fichier introuvable</h1><p>Ce script doit être placé <strong>à la racine '
+        . 'du site</strong>, à côté de <code>inc_diagnostic.php</code>.</p>'
+        . '<p>Chemin analysé : <code>' . htmlspecialchars($racine, ENT_QUOTES, 'UTF-8')
+        . '</code></p>',
+        500
+    );
+}
+
+define('DEUS_DAF', true);
+
+// On force l'affichage : ce script sert précisément à voir ce qui casse.
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+require_once $include;
+
+$resultat = collect_diagnostic($racine);
+
+// ---------------------------------------------------------------------
+// Rendu
+// ---------------------------------------------------------------------
+$h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+$corps = '<h1>Deus DAF — diagnostic d\'installation</h1>'
+    . '<p class="meta">' . $h(date('d/m/Y H:i:s')) . ' — ' . $h($racine)
+    . ' — PHP ' . $h(PHP_VERSION) . ' (' . $h(PHP_SAPI) . ')</p>';
+
+foreach ($resultat['sections'] as $section) {
+    $corps .= '<h2>' . $h($section['titre']) . '</h2><table>';
+
+    foreach ($section['checks'] as $check) {
+        $etat = $check['etat'];
+        $mot  = match ($etat) { 'ok' => 'OK', 'warn' => 'ATTENTION', default => 'ÉCHEC' };
+
+        $corps .= '<tr class="' . $h($etat) . '">'
+            . '<td class="e ' . $h($etat) . '">' . $mot . '</td>'
+            . '<td class="l">' . $h($check['libelle']) . '</td>'
+            . '<td>' . $h($check['detail']);
+
+        if ($check['remede'] !== []) {
+            $corps .= '<div class="fix">' . $h(implode("\n", $check['remede'])) . '</div>';
+        }
+
+        $corps .= '</td></tr>';
+    }
+
+    $corps .= '</table>';
+}
+
+if ($resultat['echecs'] === 0) {
+    $corps .= '<div class="bilan ok">Aucun échec bloquant'
+        . ($resultat['alertes'] > 0 ? ' — ' . $resultat['alertes'] . ' avertissement(s).' : '.')
+        . '<br>Si le site renvoie malgré tout une erreur 500, la panne est dans la configuration '
+        . 'du serveur web et non dans PHP : essayez '
+        . '<code>cp deploy/htaccess-restricted.sample .htaccess</code>.</div>';
+} else {
+    $corps .= '<div class="bilan ko">' . $resultat['echecs'] . ' échec(s) et '
+        . $resultat['alertes'] . ' avertissement(s). Traiter les lignes rouges en premier.</div>';
+}
+
+$corps .= '<div class="rappel"><strong>À faire maintenant :</strong> supprimer ce fichier '
+    . '(<code>' . $h(basename(__FILE__)) . '</code>) du serveur. Il expose la structure de '
+    . 'votre installation et l\'état de la base.</div>';
+
+page('Diagnostic — Deus DAF', $corps);

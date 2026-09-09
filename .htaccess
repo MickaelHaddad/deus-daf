@@ -1,0 +1,118 @@
+# =====================================================================
+#  deus-daf — configuration Apache
+# =====================================================================
+#  Ce fichier est la protection RÉELLE de l'application : il bloque
+#  l'accès direct aux includes, au schéma SQL, aux journaux et aux
+#  scripts d'administration, et force HTTPS.
+#
+#  Prérequis : Apache 2.4, « AllowOverride All » sur le répertoire, et
+#  les modules mod_rewrite et mod_headers activés.
+#
+#  Si votre hébergeur limite AllowOverride, ce fichier provoque une
+#  erreur 500 : utiliser alors deploy/htaccess-restricted.sample, qui
+#  offre la même protection en n'utilisant que mod_rewrite.
+#
+#  Équivalent Nginx : deploy/nginx.conf.sample.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# Pas de directive php_flag ici.
+# ---------------------------------------------------------------------
+# « php_flag » n'est reconnu que par mod_php. Sous PHP-FPM ou CGI —
+# configuration la plus répandue aujourd'hui — Apache répond 500 sur
+# TOUT le site en rencontrant cette directive. L'affichage des erreurs
+# est de toute façon piloté par inc_config.php ('env' => 'production'),
+# ce qui évite d'avoir deux sources de vérité.
+
+# ---------------------------------------------------------------------
+# Pas d'indexation des dossiers
+# ---------------------------------------------------------------------
+Options -Indexes
+
+# ---------------------------------------------------------------------
+# Redirection HTTPS et blocage des dossiers applicatifs
+# ---------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Dossiers applicatifs : jamais servis par le web. Placé avant la
+    # redirection HTTPS pour bloquer sans aller-retour inutile.
+    RewriteRule ^(storage|db|bin|deploy)(/|$) - [F,L]
+
+    # On ne redirige pas si la requête est déjà en HTTPS, y compris
+    # derrière un proxy inverse ou un répartiteur de charge.
+    # Chaque condition doit être fausse pour que la redirection ait lieu.
+    # On teste toutes les façons dont un proxy inverse peut signaler que
+    # le visiteur est bien arrivé en HTTPS : en oublier une provoque une
+    # boucle de redirection sans fin.
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{SERVER_PORT} !=443
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{HTTP:X-Forwarded-Protocol} !=https
+    RewriteCond %{HTTP:X-Forwarded-Ssl} !=on
+    RewriteCond %{HTTP:X-Forwarded-Port} !=443
+    RewriteCond %{HTTP:X-Url-Scheme} !=https
+    RewriteCond %{HTTP:Front-End-Https} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ---------------------------------------------------------------------
+# Includes : jamais appelés directement
+# ---------------------------------------------------------------------
+# Deuxième barrière : le code PHP se défend déjà seul, mais si le
+# gestionnaire PHP venait à être mal configuré, ces fichiers seraient
+# servis en clair — inc_config.php contient le mot de passe de la base.
+<FilesMatch "^inc_.*\.php$">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+# Fichiers cachés : .git, .gitignore, .htaccess, .env…
+# ---------------------------------------------------------------------
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+# Extensions qui n'ont rien à faire sur le web
+# ---------------------------------------------------------------------
+# Volontairement, « json » n'est PAS dans cette liste : le dossier
+# assets/ en contient (traductions de plugins), et les bloquer casserait
+# des librairies au premier ajout.
+<FilesMatch "\.(sql|log|md|sample|bak|dist|ini|sh|lock|yml|yaml|swp|orig|rej)$">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+# Sauvegardes d'éditeur laissées par erreur
+# ---------------------------------------------------------------------
+<FilesMatch "(~|\.php\.[a-z]+)$">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+# En-têtes de sécurité
+# ---------------------------------------------------------------------
+# La Content-Security-Policy est émise par PHP : elle contient un nonce
+# recalculé à chaque requête. Les en-têtes ci-dessous couvrent en plus
+# les fichiers statiques.
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "same-origin"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" "expr=%{HTTPS} == 'on'"
+    Header always unset X-Powered-By
+</IfModule>
+
+# ---------------------------------------------------------------------
+# Cache des assets statiques
+# ---------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css               "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType font/woff2             "access plus 1 year"
+    ExpiresByType image/png              "access plus 30 days"
+    ExpiresByType image/svg+xml          "access plus 30 days"
+    ExpiresByType image/x-icon           "access plus 30 days"
+</IfModule>

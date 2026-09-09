@@ -13,16 +13,16 @@ if (!defined('DEUS_DAF')) {
 return [
     'env' => 'development',
     'db' => [
-        'host'     => '127.0.0.1',
+        'host'     => 'gcsql'.rand(0,9),
         'port'     => 3306,
-        'name'     => 'deus_daf',
-        'user'     => 'deus_daf',
-        'password' => 'MotDePasseLocalTest',
+        'name'     => 'gc',
+        'user'     => 'gcconsole-rw',
+        'password' => '.OXjhN]FG(cv_4Fc',
     ],
     'app' => [
         'name'     => 'Deus DAF',
         'company'  => 'Deus',
-        'base_url' => 'http://127.0.0.1:8080',
+        'base_url' => 'https://www.gaym.com/qmKyuhJvJeATCD',
         'timezone' => 'Europe/Paris',
     ],
     'session' => [

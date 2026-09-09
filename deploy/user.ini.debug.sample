@@ -1,0 +1,27 @@
+; =====================================================================
+;  Fichier de DÉPANNAGE TEMPORAIRE — à supprimer une fois le problème
+;  résolu.
+; =====================================================================
+;  Utilité : afficher les erreurs PHP qui surviennent AVANT que
+;  l'application n'ait pu démarrer — typiquement une erreur d'analyse,
+;  qui produit sinon une page 500 parfaitement blanche.
+;
+;  Installation :
+;      cp deploy/user.ini.debug.sample .user.ini
+;
+;  Fonctionne avec PHP en FPM ou CGI (le cas courant). PHP relit ce
+;  fichier au bout de 5 minutes par défaut (user_ini.cache_ttl) : ne pas
+;  s'étonner que l'effet ne soit pas immédiat.
+;
+;  ⚠️  À SUPPRIMER dès le diagnostic terminé :
+;      rm .user.ini
+;
+;  Laisser ce fichier en production expose les chemins du serveur, les
+;  noms de fichiers et parfois des fragments de requêtes SQL à toute
+;  personne qui provoque une erreur.
+; =====================================================================
+
+display_errors = On
+display_startup_errors = On
+error_reporting = E_ALL
+html_errors = On
