@@ -17,6 +17,91 @@ if (!defined('DEUS_DAF')) {
 }
 
 // =====================================================================
+// Sociétés et comptes bancaires
+// =====================================================================
+
+/**
+ * Les sociétés du groupe.
+ *
+ * Liste tenue ici plutôt qu'en ENUM SQL : en ajouter une est une ligne
+ * de PHP, sans ALTER TABLE sur une base partagée avec d'autres
+ * applications. La clé est stockée en base, le libellé n'est qu'un
+ * affichage — renommer une société ne touche donc à aucune donnée.
+ *
+ * @return array<string,string>
+ */
+function companies(): array
+{
+    return [
+        'deus_communications' => 'Deus Communications',
+        'sued'                => 'Sued',
+        'pastel_services'     => 'Pastel Services',
+    ];
+}
+
+/** Libellé d'une société, ou la clé brute si elle n'est plus connue. */
+function company_label(?string $key): string
+{
+    if ($key === null || $key === '') {
+        return '—';
+    }
+
+    return companies()[$key] ?? $key;
+}
+
+/**
+ * Toutes les banques, avec ce qu'elles portent : nombre de cartes,
+ * nombre de services actifs payés, et coût mensuel correspondant.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function fetch_banks(): array
+{
+    global $sql;
+
+    return $sql->query(
+        "SELECT b.*,
+                COUNT(DISTINCT c.id)                                        AS nb_cartes,
+                COUNT(DISTINCT CASE WHEN c.status = 'active' THEN c.id END) AS nb_cartes_actives,
+                COUNT(DISTINCT CASE WHEN s.status = 'active' THEN s.id END) AS nb_services,
+                COALESCE(SUM(CASE WHEN s.status = 'active'
+                                  THEN s.monthly_cost END), 0)              AS cout_mensuel
+           FROM fi_banks b
+           LEFT JOIN fi_cards    c ON c.bank_id = b.id
+           LEFT JOIN fi_services s ON s.card_id = c.id
+          GROUP BY b.id
+          ORDER BY b.company, b.name"
+    )->fetchAll();
+}
+
+/**
+ * Répartition du coût mensuel par société.
+ *
+ * La dépense remonte la chaîne service → carte → banque → société :
+ * c'est ce que permet précisément l'introduction du niveau « banque ».
+ * Les services sans carte n'ont pas de société rattachable et sont
+ * regroupés à part.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function service_breakdown_by_company(): array
+{
+    global $sql;
+
+    return $sql->query(
+        "SELECT b.company,
+                COUNT(DISTINCT s.id) AS nb_services,
+                SUM(s.monthly_cost)  AS cout_mensuel
+           FROM fi_services s
+           LEFT JOIN fi_cards c ON c.id = s.card_id
+           LEFT JOIN fi_banks b ON b.id = c.bank_id
+          WHERE s.status = 'active' AND s.monthly_cost > 0
+          GROUP BY b.company
+          ORDER BY cout_mensuel DESC"
+    )->fetchAll();
+}
+
+// =====================================================================
 // Cartes bancaires
 // =====================================================================
 
@@ -257,10 +342,13 @@ function service_select_sql(): string
                    c.last4      AS card_last4,
                    c.status     AS card_status,
                    c.expires_on AS card_expires_on,
+                   b.name       AS bank_name,
+                   b.company    AS bank_company,
                    u.first_name AS owner_first_name,
                    u.last_name  AS owner_last_name
               FROM fi_services s
               LEFT JOIN fi_cards c ON c.id = s.card_id
+              LEFT JOIN fi_banks b ON b.id = c.bank_id
               LEFT JOIN fi_users u ON u.id = s.owner_id";
 }
 

@@ -33,41 +33,51 @@ VALUES
     (5, 'Thomas',  'Roux',    'thomas@exemple.fr',  '$2y$12$jsGZfEqM5TXlTEK2/etGaerGMJtYqMGH.D1kLlS23F15bdQsz0wBu', 'member', 'collaborator', 0, 'auto');
 
 -- ---------------------------------------------------------------------
+-- Comptes bancaires
+-- ---------------------------------------------------------------------
+-- Les trois sociétés du groupe, chacune avec son établissement.
+INSERT INTO `fi_banks` (`id`, `name`, `company`, `notes`, `created_by`)
+VALUES
+    (1, 'Qonto',       'deus_communications', 'Compte principal, cartes des abonnements techniques.', 1),
+    (2, 'Revolut',     'sued',                'Compte secondaire, outils de design et supervision.', 1),
+    (3, 'BNP Paribas', 'pastel_services',     'Ancien compte, clôturé lors du changement de banque.', 1);
+
+-- ---------------------------------------------------------------------
 -- Cartes bancaires
 -- ---------------------------------------------------------------------
 -- Rappel : expires_on = dernier jour du mois d'expiration.
 -- LAST_DAY() garantit cette règle quel que soit le mois.
 INSERT INTO `fi_cards`
-    (`id`, `label`, `last4`, `expires_on`, `issuer`, `holder_id`, `type`, `status`, `notes`, `created_by`)
+    (`id`, `label`, `last4`, `expires_on`, `bank_id`, `holder_id`, `type`, `status`, `notes`, `created_by`)
 VALUES
     -- Expirée depuis 2 mois, et elle porte encore des services actifs → alerte CRITIQUE
     (1, 'CB Pro Qonto — Mickaël', '4242', LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 2 MONTH)),
-        'Qonto', 1, 'credit', 'active',
+        1, 1, 'credit', 'active',
         'Carte principale des abonnements techniques. Renouvellement demandé à la banque.', 1),
 
     -- Expire dans ~45 jours → alerte AVERTISSEMENT
     (2, 'CB Pro Qonto — Sophie', '8817', LAST_DAY(DATE_ADD(CURDATE(), INTERVAL 45 DAY)),
-        'Qonto', 2, 'debit', 'active',
+        1, 2, 'debit', 'active',
         'Abonnements bureautiques et communication.', 1),
 
     -- Expire dans ~80 jours → alerte INFORMATION
     (3, 'CB Revolut Business', '3391', LAST_DAY(DATE_ADD(CURDATE(), INTERVAL 80 DAY)),
-        'Revolut', 3, 'debit', 'active',
+        2, 3, 'debit', 'active',
         'Outils de design et de supervision.', 1),
 
     -- Rien à signaler
     (4, 'CB virtuelle — Régie pub', '7025', LAST_DAY(DATE_ADD(CURDATE(), INTERVAL 2 YEAR)),
-        'Qonto', 1, 'virtual', 'active',
+        1, 1, 'virtual', 'active',
         'Carte virtuelle dédiée aux plateformes publicitaires, plafond mensuel 2 000 €.', 1),
 
     -- Résiliée : le statut saisi prime sur le calcul d'expiration
     (5, 'Ancienne CB BNP', '1104', LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 8 MONTH)),
-        'BNP Paribas', 2, 'credit', 'cancelled',
+        3, 2, 'credit', 'cancelled',
         'Compte clôturé en même temps que le changement de banque.', 1),
 
     -- Active mais ne porte aucun service → candidate à la résiliation
     (6, 'CB prépayée événements', '5566', LAST_DAY(DATE_ADD(CURDATE(), INTERVAL 14 MONTH)),
-        'Revolut', 4, 'prepaid', 'active',
+        2, 4, 'prepaid', 'active',
         'Ouverte pour un salon, plus utilisée depuis.', 1);
 
 -- ---------------------------------------------------------------------

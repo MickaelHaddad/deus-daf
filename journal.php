@@ -21,7 +21,7 @@ const JOURNAL_PAR_PAGE = 50;
 $page       = max(1, (int) ($_GET['page'] ?? 1));
 $filtreUser = (int) ($_GET['utilisateur'] ?? 0);
 $filtreType = (string) ($_GET['entite'] ?? '');
-$typesConnus = ['user', 'card', 'service', 'setting'];
+$typesConnus = ['user', 'bank', 'card', 'service', 'setting'];
 
 if (!in_array($filtreType, $typesConnus, true)) {
     $filtreType = '';
@@ -89,6 +89,7 @@ function entity_label(?string $type): string
 {
     return match ($type) {
         'user'    => 'Utilisateur',
+        'bank'    => 'Banque',
         'card'    => 'Carte',
         'service' => 'Service',
         'setting' => 'Réglage',

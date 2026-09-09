@@ -18,6 +18,7 @@ $alertesCartes = fetch_card_alerts();
 $autresAlertes = fetch_other_alerts();
 $totaux        = service_totals();
 $parReferent   = service_breakdown_by_owner();
+$parSociete    = service_breakdown_by_company();
 
 // Cartes réellement utilisables : ni résiliées, ni expirées.
 $nbCartesValides = (int) $sql->query(
@@ -31,6 +32,11 @@ $derniersServices = $sql->query(
 $maxReferent = 0.0;
 foreach ($parReferent as $ligne) {
     $maxReferent = max($maxReferent, (float) $ligne['cout_mensuel']);
+}
+
+$maxSociete = 0.0;
+foreach ($parSociete as $ligne) {
+    $maxSociete = max($maxSociete, (float) $ligne['cout_mensuel']);
 }
 
 $niveaux = [
@@ -200,8 +206,38 @@ if ($secondaires !== []) { ?>
                 </div>
 
                 <div class="row g-3">
+                    <!-- Répartition par société : la dépense remonte
+                         service → carte → banque → société -->
+                    <div class="col-lg-4">
+                        <div class="kpi h-100">
+                            <div class="kpi-label mb-2">Dépense mensuelle par société</div>
+<?php if ($parSociete === []) { ?>
+                            <p class="text-sm text-secondary mb-0">Aucune dépense mensuelle enregistrée.</p>
+<?php } else { ?>
+                            <div class="breakdown">
+<?php foreach ($parSociete as $ligne) {
+    $part = $maxSociete > 0 ? ((float) $ligne['cout_mensuel'] / $maxSociete) * 100 : 0;
+?>
+                                <div class="breakdown-row">
+                                    <span class="text-truncate">
+                                        <?= $ligne['company'] === null
+                                            ? '<span class="text-warning">Sans carte</span>'
+                                            : h(company_label((string) $ligne['company'])) ?>
+                                        <span class="text-secondary text-xsm">(<?= (int) $ligne['nb_services'] ?>)</span>
+                                    </span>
+                                    <span class="breakdown-track">
+                                        <span class="breakdown-bar" style="--bar-width: <?= number_format($part, 2, '.', '') ?>%"></span>
+                                    </span>
+                                    <span class="text-nowrap"><?= h(money((float) $ligne['cout_mensuel'])) ?></span>
+                                </div>
+<?php } ?>
+                            </div>
+<?php } ?>
+                        </div>
+                    </div>
+
                     <!-- Répartition par carte -->
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="kpi h-100">
                             <div class="kpi-label mb-2">Dépense mensuelle par carte</div>
                             <?= render_card_breakdown() ?>
@@ -209,7 +245,7 @@ if ($secondaires !== []) { ?>
                     </div>
 
                     <!-- Répartition par référent -->
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <div class="kpi h-100">
                             <div class="kpi-label mb-2">Dépense mensuelle par référent</div>
                             <div class="breakdown">

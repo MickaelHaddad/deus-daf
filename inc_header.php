@@ -127,6 +127,11 @@ $nonce = csp_nonce();
                                         <i class="fa-solid fa-credit-card fa-fw me-2" aria-hidden="true"></i>Cartes
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?= menu_active('banques') ?>" href="banques_liste.php">
+                                        <i class="fa-solid fa-building-columns fa-fw me-2" aria-hidden="true"></i>Banques
+                                    </a>
+                                </li>
 <?php if (is_admin()) { ?>
                                 <li class="nav-item">
                                     <a class="nav-link <?= menu_active('utilisateurs') ?>" href="utilisateurs_liste.php">

@@ -13,7 +13,7 @@ if (!defined('DEUS_DAF')) {
 return [
     'env' => 'development',
     'db' => [
-        'host'     => 'gcsql'.rand(0,9),
+        'host'     => 'gcsql'.rand(1,9),
         'port'     => 3306,
         'name'     => 'gc',
         'user'     => 'gcconsole-rw',
@@ -22,7 +22,7 @@ return [
     'app' => [
         'name'     => 'Deus DAF',
         'company'  => 'Deus',
-        'base_url' => 'https://www.gaym.com/qmKyuhJvJeATCD',
+        'base_url' => 'https://gc-compta.syntencloud.com',
         'timezone' => 'Europe/Paris',
     ],
     'session' => [

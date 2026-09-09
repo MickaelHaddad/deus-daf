@@ -17,15 +17,20 @@ require_login();
 $cartes = $sql->query(
     "SELECT c.*,
             u.first_name, u.last_name,
+            b.name AS bank_name, b.company AS bank_company,
             COUNT(CASE WHEN s.status = 'active' THEN 1 END)                       AS nb_services,
             COUNT(s.id)                                                           AS nb_services_total,
             COALESCE(SUM(CASE WHEN s.status = 'active' THEN s.monthly_cost END),0) AS cout_mensuel
        FROM fi_cards c
-       JOIN fi_users u    ON u.id = c.holder_id
+       JOIN fi_users u ON u.id = c.holder_id
+       JOIN fi_banks b ON b.id = c.bank_id
        LEFT JOIN fi_services s ON s.card_id = c.id
-      GROUP BY c.id, u.first_name, u.last_name
+      GROUP BY c.id, u.first_name, u.last_name, b.name, b.company
       ORDER BY c.expires_on ASC"
 )->fetchAll();
+
+// Pré-filtrage éventuel depuis la page des comptes bancaires.
+$banqueFiltre = isset($_GET['banque']) ? (int) $_GET['banque'] : 0;
 
 $title   = 'Cartes bancaires — ' . $config['app']['name'];
 $page_id = 'page_cartes';
@@ -51,18 +56,27 @@ include __DIR__ . '/inc_header.php';
 
                 <!-- Barre de filtres -->
                 <div class="row g-2 my-2">
-                    <div class="col-md-5">
+                    <div class="col-md-3">
                         <label class="visually-hidden" for="filtreRecherche">Rechercher une carte</label>
                         <input type="search" class="form-control" id="filtreRecherche" data-daf-search="1"
                                placeholder="Rechercher : libellé, 4 chiffres, titulaire, banque…">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="visually-hidden" for="filtreStatut">Filtrer par statut</label>
                         <select class="form-select" id="filtreStatut">
                             <option value="all">Toutes les cartes</option>
                             <option value="renew">À renouveler (expirées ou proches)</option>
                             <option value="ok">Sans souci</option>
                             <option value="cancelled">Résiliées</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="visually-hidden" for="filtreSociete">Filtrer par société</label>
+                        <select class="form-select" id="filtreSociete">
+                            <option value="">Toutes les sociétés</option>
+<?php foreach (companies() as $cle => $libelle) { ?>
+                            <option value="<?= h($cle) ?>"><?= h($libelle) ?></option>
+<?php } ?>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -93,11 +107,14 @@ include __DIR__ . '/inc_header.php';
                     <article class="card-tile <?= $classe ?>"
                              data-statut="<?= h($statut) ?>"
                              data-rang="<?= $statut === 'cancelled' ? 1 : 0 ?>"
+                             data-banque="<?= (int) $c['bank_id'] ?>"
+                             data-societe="<?= h((string) $c['bank_company']) ?>"
                              data-expiry="<?= h((string) $c['expires_on']) ?>"
                              data-cost="<?= (float) $c['cout_mensuel'] ?>"
                              data-label="<?= h(mb_strtolower((string) $c['label'])) ?>"
                              data-recherche="<?= h(mb_strtolower(
-                                 $c['label'] . ' ' . $c['last4'] . ' ' . full_name($c) . ' ' . (string) $c['issuer']
+                                 $c['label'] . ' ' . $c['last4'] . ' ' . full_name($c) . ' '
+                                 . (string) $c['bank_name'] . ' ' . company_label((string) $c['bank_company'])
                              )) ?>">
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
@@ -112,7 +129,11 @@ include __DIR__ . '/inc_header.php';
                         <div class="text-sm text-secondary">
                             <div>
                                 <i class="fa-solid fa-user fa-fw me-1" aria-hidden="true"></i><?= h(full_name($c)) ?>
-                                <?= $c['issuer'] !== null && $c['issuer'] !== '' ? ' · ' . h((string) $c['issuer']) : '' ?>
+                            </div>
+                            <div>
+                                <i class="fa-solid fa-building-columns fa-fw me-1" aria-hidden="true"></i>
+                                <?= h((string) $c['bank_name']) ?>
+                                <span class="text-xsm">· <?= h(company_label((string) $c['bank_company'])) ?></span>
                             </div>
                             <div>
                                 <i class="fa-solid fa-calendar fa-fw me-1" aria-hidden="true"></i>
@@ -182,9 +203,12 @@ include __DIR__ . '/inc_header.php';
 <?php include __DIR__ . '/inc_footer.php'; ?>
         <script nonce="<?= h(csp_nonce()) ?>">
             document.addEventListener("DOMContentLoaded", function () {
+                // Filtre transmis par la page des comptes bancaires.
+                var banqueFiltre = <?= (int) $banqueFiltre ?>;
                 var grille    = document.getElementById("grilleCartes");
                 var recherche = document.getElementById("filtreRecherche");
                 var statut    = document.getElementById("filtreStatut");
+                var societe   = document.getElementById("filtreSociete");
                 var tri       = document.getElementById("filtreTri");
                 var compteur  = document.getElementById("compteurCartes");
                 var vide      = document.getElementById("aucunResultat");
@@ -207,7 +231,9 @@ include __DIR__ . '/inc_header.php';
                     vignettes.forEach(function (tile) {
                         var okTexte = terme === "" || tile.dataset.recherche.indexOf(terme) !== -1;
                         var okStatut = accepte === null || accepte.indexOf(tile.dataset.statut) !== -1;
-                        var affiche = okTexte && okStatut;
+                        var okSociete = societe.value === "" || tile.dataset.societe === societe.value;
+                        var okBanque = banqueFiltre === 0 || parseInt(tile.dataset.banque, 10) === banqueFiltre;
+                        var affiche = okTexte && okStatut && okSociete && okBanque;
 
                         tile.hidden = !affiche;
                         if (affiche) { visibles++; }
@@ -236,6 +262,7 @@ include __DIR__ . '/inc_header.php';
 
                 recherche.addEventListener("input", appliquer);
                 statut.addEventListener("change", appliquer);
+                societe.addEventListener("change", appliquer);
                 tri.addEventListener("change", appliquer);
                 appliquer();
             });

@@ -265,18 +265,22 @@ function collect_diagnostic(string $racine): array
     }
 
     if ($pdo !== null) {
-        $attendues = ['fi_users', 'fi_cards', 'fi_services', 'fi_settings', 'fi_login_attempts', 'fi_activity_log'];
+        $attendues = ['fi_users', 'fi_banks', 'fi_cards', 'fi_services',
+                      'fi_settings', 'fi_login_attempts', 'fi_activity_log'];
         $presentes = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         $absentes  = array_values(array_diff($attendues, $presentes));
 
         if ($absentes !== []) {
             $checks[] = $c('fail', 'Tables', 'manquantes : ' . implode(', ', $absentes), [
                 'mysql -u root -p ' . ($config['db']['name'] ?? '') . ' < db/schema.sql',
+                '',
+                'Si seule fi_banks manque, il s\'agit d\'une installation antérieure :',
+                'appliquer db/migration-2026-09-banques.sql plutôt que de tout réimporter.',
             ]);
         } else {
-            $checks[] = $c('ok', 'Tables', '6 tables fi_* présentes');
+            $checks[] = $c('ok', 'Tables', '7 tables fi_* présentes');
 
-            foreach (['fi_users', 'fi_cards', 'fi_services', 'fi_activity_log'] as $table) {
+            foreach (['fi_users', 'fi_banks', 'fi_cards', 'fi_services', 'fi_activity_log'] as $table) {
                 $n = (int) $pdo->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
                 $checks[] = $c('ok', 'Contenu de ' . $table, $n . ' ligne(s)');
             }

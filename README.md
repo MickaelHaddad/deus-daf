@@ -69,10 +69,32 @@ FLUSH PRIVILEGES;
 mysql -u root -p deus_daf < /var/www/deus-daf/db/schema.sql
 ```
 
-Le script crée six tables préfixées `fi_` (`fi_users`, `fi_cards`,
-`fi_services`, `fi_settings`, `fi_login_attempts`, `fi_activity_log`),
-ce qui lui permet de cohabiter avec d'autres applications dans la même
-base.
+Le script crée sept tables préfixées `fi_` (`fi_users`, `fi_banks`,
+`fi_cards`, `fi_services`, `fi_settings`, `fi_login_attempts`,
+`fi_activity_log`), ce qui lui permet de cohabiter avec d'autres
+applications dans la même base.
+
+**Mise à jour d'une installation antérieure** : si la base existe déjà
+sans la table `fi_banks`, ne pas réimporter `schema.sql` — il commence
+par des `DROP TABLE`. Appliquer à la place :
+
+```bash
+mysql -u root -p deus_daf < db/migration-2026-09-banques.sql
+```
+
+Cette migration crée les comptes bancaires à partir des émetteurs déjà
+saisis sur les cartes, les rattache toutes, puis supprime l'ancienne
+colonne `issuer`. Les sociétés sont initialisées à « Deus
+Communications » et restent à corriger depuis l'écran Banques.
+
+**Sans accès SSH ni client SQL** : copier
+`deploy/migrate-web.php.sample` à la racine sous le nom `migration.php`,
+y renseigner la clé qu'il propose, puis ouvrir
+`https://votre-site/migration.php?cle=VOTRE_CLE`. Le script affiche le
+contenu du fichier SQL, demande confirmation, exécute les instructions
+une par une et rend compte de chacune. **Sauvegarder la base d'abord** :
+MySQL ne sait pas annuler une modification de structure. Supprimer le
+fichier ensuite.
 
 > ⚠️ `schema.sql` commence par des `DROP TABLE`. Ils ne visent que les
 > tables `fi_*`, mais **le rejouer sur une base en service efface toutes
@@ -467,6 +489,7 @@ index.php               Connexion (seule page accessible sans session)
 access_ctrl.php         Traitement de la connexion, réponse JSON
 home.php                Tableau de bord et bloc Alertes
 services_liste.php      Tableau des abonnements, totaux, filtres, export
+banques_liste.php       Comptes bancaires, groupés par société
 cartes_liste.php        Vignettes des cartes, tri et filtres par échéance
 utilisateurs_liste.php  Gestion des comptes (administrateurs)
 journal.php             Journal d'activité (administrateurs)
@@ -505,6 +528,13 @@ assets/scss/daf.css     Styles propres à cette application
   est recalculé à partir de `expires_on` à chaque lecture, donc toujours
   exact, sans tâche planifiée. Seul « résiliée » est saisi à la main, et
   il prime sur le calcul.
+- **Chaîne de rattachement** : société → banque → carte → service. La
+  société n'est pas portée par la carte mais par le compte bancaire, ce
+  qui évite de la ressaisir sur chaque carte et permet de remonter la
+  dépense jusqu'à l'entité qui la supporte. La liste des sociétés est
+  tenue dans `companies()` (`inc_metier.php`) plutôt qu'en ENUM SQL : en
+  ajouter une est une ligne de PHP, sans `ALTER TABLE` sur une base
+  partagée.
 - **Coût mensualisé** : colonne générée `STORED` en base
   (`fi_services.monthly_cost`). MySQL la maintient, elle ne peut pas
   diverger du montant saisi.

@@ -44,6 +44,12 @@ $stmt = $sql->prepare(
 $stmt->execute([$creation ? 0 : (int) $carte['holder_id']]);
 $titulaires = $stmt->fetchAll();
 
+// Une carte dépend obligatoirement d'un compte bancaire : sans compte
+// enregistré, il n'y a rien à saisir.
+$banques = $sql->query(
+    'SELECT id, name, company FROM fi_banks ORDER BY company, name'
+)->fetchAll();
+
 $expiryValeur = $creation ? '' : date('m/y', (int) strtotime((string) $carte['expires_on']));
 ?>
 <div class="modal fade" id="modalCarte" tabindex="-1" aria-labelledby="titreModalCarte" aria-hidden="true">
@@ -60,6 +66,19 @@ $expiryValeur = $creation ? '' : date('m/y', (int) strtotime((string) $carte['ex
                 </div>
 
                 <div class="modal-body">
+<?php if ($banques === []) { ?>
+                    <div class="alert alert-warning mb-0" role="status">
+                        <p class="mb-2">
+                            <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+                            <strong>Aucun compte bancaire enregistré.</strong>
+                        </p>
+                        <p class="text-sm mb-2">
+                            Une carte dépend forcément d'un compte, lui-même rattaché à une société
+                            du groupe. Créez d'abord la banque, puis revenez ajouter la carte.
+                        </p>
+                        <a class="btn btn-sm btn-primary" href="banques_liste.php">Aller aux comptes bancaires</a>
+                    </div>
+<?php } else { ?>
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label" for="c_label">Libellé</label>
@@ -114,10 +133,18 @@ $expiryValeur = $creation ? '' : date('m/y', (int) strtotime((string) $carte['ex
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label" for="c_issuer">Banque / émetteur</label>
-                            <input type="text" class="form-control" id="c_issuer" name="issuer" maxlength="80"
-                                   placeholder="Qonto, BNP, Revolut…"
-                                   value="<?= h((string) ($carte['issuer'] ?? '')) ?>">
+                            <label class="form-label" for="c_bank_id">Compte bancaire</label>
+                            <select class="form-select" id="c_bank_id" name="bank_id" required>
+                                <option value="">— Choisir —</option>
+<?php foreach ($banques as $b) { ?>
+                                <option value="<?= (int) $b['id'] ?>"
+                                    <?= (int) ($carte['bank_id'] ?? 0) === (int) $b['id'] ? 'selected' : '' ?>>
+                                    <?= h((string) $b['name']) ?> — <?= h(company_label((string) $b['company'])) ?>
+                                </option>
+<?php } ?>
+                            </select>
+                            <div class="form-text">Détermine la société qui supporte la dépense.</div>
+                            <div class="invalid-feedback"></div>
                         </div>
 
                         <div class="col-12">
@@ -144,13 +171,18 @@ $expiryValeur = $creation ? '' : date('m/y', (int) strtotime((string) $carte['ex
 <?php } ?>
                         </div>
                     </div>
+<?php } ?>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <?= $banques === [] ? 'Fermer' : 'Annuler' ?>
+                    </button>
+<?php if ($banques !== []) { ?>
                     <button type="submit" class="btn btn-primary">
                         <?= $creation ? 'Créer la carte' : 'Enregistrer' ?>
                     </button>
+<?php } ?>
                 </div>
             </form>
         </div>

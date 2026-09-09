@@ -86,7 +86,7 @@ fwrite($sortie, "\xEF\xBB\xBF");
 fputcsv($sortie, [
     'Service', 'URL', 'Type d\'abonnement', 'Montant EUR', 'Coût mensualisé EUR',
     'Coût annualisé EUR', 'Carte', '4 derniers chiffres', 'État de la carte',
-    'Référent', 'Prochaine échéance', 'Statut', 'Commentaire',
+    'Banque', 'Société', 'Référent', 'Prochaine échéance', 'Statut', 'Commentaire',
 ], ';', '"', '');
 
 $totalMensuel = 0.0;
@@ -115,6 +115,8 @@ foreach ($services as $s) {
         $s['card_label'] ?? '',
         $s['card_last4'] ?? '',
         $etatCarte,
+        $s['bank_name'] ?? '',
+        $s['bank_company'] === null ? '' : company_label((string) $s['bank_company']),
         $s['owner_id'] === null ? '' : trim((string) $s['owner_first_name'] . ' ' . (string) $s['owner_last_name']),
         $s['next_renewal_on'] ?? '',
         service_status_badge((string) $s['status'])['label'],

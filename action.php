@@ -54,6 +54,17 @@ try {
             break;
 
         // -------------------------------------------------------------
+        // Comptes bancaires
+        // -------------------------------------------------------------
+        case 'banque_save':
+            action_banque_save();
+            break;
+
+        case 'banque_delete':
+            action_banque_delete();
+            break;
+
+        // -------------------------------------------------------------
         // Cartes bancaires
         // -------------------------------------------------------------
         case 'carte_save':
@@ -425,6 +436,7 @@ function action_carte_save()
     }
 
     $label    = post_string('label', 120);
+    $bankId   = post_int('bank_id');
     // Lecture volontairement large : post_string() tronque à la longueur
     // demandée, or tronquer « 12345 » en « 1234 » enregistrerait les 4
     // PREMIERS chiffres en les faisant passer pour les 4 derniers. On lit
@@ -432,7 +444,6 @@ function action_carte_save()
     // exactement quatre chiffres.
     $last4    = post_string('last4', 32);
     $expiry   = post_string('expiry', 32);
-    $issuer   = post_string('issuer', 80);
     $holderId = post_int('holder_id');
     $type     = post_enum('type', array_keys(card_types()));
     $notes    = post_string('notes', 2000);
@@ -446,6 +457,18 @@ function action_carte_save()
 
     if (!preg_match('/^\d{4}$/', $last4)) {
         $errors['last4'] = 'Saisissez exactement les 4 derniers chiffres.';
+    }
+
+    // Une carte dépend forcément d'un compte bancaire : c'est lui qui
+    // porte la société à laquelle la dépense sera imputée.
+    if ($bankId === null || $bankId <= 0) {
+        $errors['bank_id'] = 'Choisissez le compte bancaire dont dépend cette carte.';
+    } else {
+        $check = $sql->prepare('SELECT id FROM fi_banks WHERE id = ?');
+        $check->execute([$bankId]);
+        if ($check->fetch() === false) {
+            $errors['bank_id'] = "Ce compte bancaire n'existe pas.";
+        }
     }
 
     [$expiresOn, $expiryError] = parse_expiry($expiry);
@@ -490,11 +513,11 @@ function action_carte_save()
     if ($id === 0) {
         $stmt = $sql->prepare(
             'INSERT INTO fi_cards
-                (label, last4, expires_on, issuer, holder_id, type, status, notes, created_by, updated_by)
+                (label, last4, expires_on, bank_id, holder_id, type, status, notes, created_by, updated_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
-            $label, $last4, $expiresOn, $issuer !== '' ? $issuer : null,
+            $label, $last4, $expiresOn, $bankId,
             $holderId, $type, $status, $notes !== '' ? $notes : null,
             (int) $me['id'], (int) $me['id'],
         ]);
@@ -510,18 +533,18 @@ function action_carte_save()
 
     $stmt = $sql->prepare(
         'UPDATE fi_cards
-            SET label = ?, last4 = ?, expires_on = ?, issuer = ?, holder_id = ?,
+            SET label = ?, last4 = ?, expires_on = ?, bank_id = ?, holder_id = ?,
                 type = ?, status = ?, notes = ?, updated_by = ?
           WHERE id = ?'
     );
     $stmt->execute([
-        $label, $last4, $expiresOn, $issuer !== '' ? $issuer : null, $holderId,
+        $label, $last4, $expiresOn, $bankId, $holderId,
         $type, $status, $notes !== '' ? $notes : null, (int) $me['id'], $id,
     ]);
 
     $after = [
         'label' => $label, 'last4' => $last4, 'expires_on' => $expiresOn,
-        'issuer' => $issuer !== '' ? $issuer : null, 'holder_id' => $holderId,
+        'bank_id' => $bankId, 'holder_id' => $holderId,
         'type' => $type, 'status' => $status, 'notes' => $notes !== '' ? $notes : null,
     ];
 
@@ -848,4 +871,131 @@ function action_reglages_save()
     }
 
     json_ok($nouvelles, 'Réglages enregistrés.');
+}
+
+// =====================================================================
+// Comptes bancaires
+// =====================================================================
+
+/**
+ * Création ou modification d'un compte bancaire.
+ * Le couple (nom, société) doit rester unique : une même banque peut
+ * servir plusieurs sociétés, mais pas deux fois la même.
+ */
+function action_banque_save(): void
+{
+    global $sql;
+
+    $me = current_user();
+    $id = post_int('id') ?? 0;
+
+    $before = null;
+    if ($id > 0) {
+        $stmt = $sql->prepare('SELECT * FROM fi_banks WHERE id = ?');
+        $stmt->execute([$id]);
+        $before = $stmt->fetch();
+
+        if ($before === false) {
+            json_error('Ce compte bancaire n\'existe plus.', null, 404);
+        }
+    }
+
+    $name    = post_string('name', 120);
+    $company = post_enum('company', array_keys(companies()));
+    $notes   = post_string('notes', 2000);
+
+    $errors = [];
+
+    if ($name === '') {
+        $errors['name'] = 'Le nom de la banque est obligatoire.';
+    }
+
+    if ($company === null) {
+        $errors['company'] = 'Choisissez la société titulaire du compte.';
+    }
+
+    if ($errors === []) {
+        $check = $sql->prepare('SELECT id FROM fi_banks WHERE name = ? AND company = ? AND id <> ?');
+        $check->execute([$name, $company, $id]);
+
+        if ($check->fetch() !== false) {
+            $errors['name'] = 'Ce compte existe déjà pour ' . company_label($company) . '.';
+        }
+    }
+
+    if ($errors !== []) {
+        json_response(false, null, 'Le formulaire contient des erreurs.', $errors, 422);
+    }
+
+    if ($id === 0) {
+        $stmt = $sql->prepare(
+            'INSERT INTO fi_banks (name, company, notes, created_by, updated_by)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([
+            $name, $company, $notes !== '' ? $notes : null,
+            (int) $me['id'], (int) $me['id'],
+        ]);
+
+        $id = (int) $sql->lastInsertId();
+
+        log_activity('create', 'bank', $id, $name . ' — ' . company_label($company), [
+            'company' => ['from' => null, 'to' => $company],
+        ]);
+
+        json_ok(['id' => $id], 'Compte bancaire créé.', 201);
+    }
+
+    $stmt = $sql->prepare(
+        'UPDATE fi_banks SET name = ?, company = ?, notes = ?, updated_by = ? WHERE id = ?'
+    );
+    $stmt->execute([$name, $company, $notes !== '' ? $notes : null, (int) $me['id'], $id]);
+
+    $after = ['name' => $name, 'company' => $company, 'notes' => $notes !== '' ? $notes : null];
+
+    log_activity('update', 'bank', $id, $name . ' — ' . company_label($company),
+        diff_fields($before, $after, array_keys($after)));
+
+    json_ok(['id' => $id], 'Compte bancaire mis à jour.');
+}
+
+/**
+ * Suppression d'un compte bancaire.
+ * Refusée dès qu'une carte en dépend : la clé étrangère est en RESTRICT,
+ * et il n'y a aucun sens à orpheliner des cartes.
+ */
+function action_banque_delete(): void
+{
+    global $sql;
+
+    $id = post_int('id') ?? 0;
+
+    $stmt = $sql->prepare('SELECT id, name, company FROM fi_banks WHERE id = ?');
+    $stmt->execute([$id]);
+    $banque = $stmt->fetch();
+
+    if ($banque === false) {
+        json_error('Ce compte bancaire n\'existe plus.', null, 404);
+    }
+
+    $stmt = $sql->prepare('SELECT COUNT(*) FROM fi_cards WHERE bank_id = ?');
+    $stmt->execute([$id]);
+    $cartes = (int) $stmt->fetchColumn();
+
+    if ($cartes > 0) {
+        json_error(
+            $cartes . ' carte' . ($cartes > 1 ? 's dépendent' : ' dépend') . ' de ce compte. '
+            . 'Rattachez-' . ($cartes > 1 ? 'les' : 'la') . ' à un autre compte avant de le supprimer.',
+            null,
+            409
+        );
+    }
+
+    $stmt = $sql->prepare('DELETE FROM fi_banks WHERE id = ?');
+    $stmt->execute([$id]);
+
+    log_activity('delete', 'bank', $id,
+        $banque['name'] . ' — ' . company_label((string) $banque['company']));
+
+    json_ok(['id' => $id], 'Compte bancaire supprimé.');
 }

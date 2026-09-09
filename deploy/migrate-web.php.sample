@@ -1,0 +1,260 @@
+<?php
+/**
+ * ---------------------------------------------------------------------
+ * Exécution des migrations SQL — version web TEMPORAIRE
+ * ---------------------------------------------------------------------
+ * Pour les hébergements sans accès SSH ni client SQL.
+ *
+ *  MODE D'EMPLOI
+ *  1. Copier ce fichier À LA RACINE du site, sous le nom
+ *     « migration.php ».
+ *  2. L'ouvrir et renseigner CLE_ACCES ci-dessous.
+ *  3. Ouvrir https://votre-site/migration.php?cle=VOTRE_CLE
+ *  4. SUPPRIMER le fichier une fois la migration passée.
+ *
+ *  ⚠️  SAUVEGARDEZ LA BASE AVANT. Une migration modifie la structure et
+ *      peut supprimer des colonnes. Rien ici n'est réversible.
+ *
+ *  Le script lit les fichiers db/migration-*.sql : une seule source de
+ *  vérité, partagée avec l'exécution en ligne de commande.
+ * ---------------------------------------------------------------------
+ */
+
+declare(strict_types=1);
+
+// =====================================================================
+//  ↓↓↓  METTRE ICI UNE VALEUR LONGUE ET ALÉATOIRE  ↓↓↓
+// =====================================================================
+const CLE_ACCES = '';
+// =====================================================================
+
+$racine = __DIR__;
+
+function page(string $titre, string $corps, int $code = 200): void
+{
+    http_response_code($code);
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Robots-Tag: noindex, nofollow');
+
+    echo '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+       . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+       . '<title>' . htmlspecialchars($titre, ENT_QUOTES, 'UTF-8') . '</title><style>'
+       . 'body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+       . 'margin:0;padding:24px;background:#f6f7f9;color:#1c1e21;line-height:1.55}'
+       . 'main{max-width:860px;margin:0 auto}h1{font-size:1.3rem;margin:0 0 16px}'
+       . 'h2{font-size:1rem;margin:24px 0 8px}'
+       . '.box{padding:14px 16px;border-radius:6px;margin:16px 0;font-size:.92rem}'
+       . '.ok{background:#e8f5ec;border:1px solid #9bd4ad}'
+       . '.ko{background:#fdecea;border:1px solid #f0a9a2}'
+       . '.warn{background:#fff4e5;border:1px solid #f0c48a}'
+       . 'pre{background:#fff;border:1px solid #d8dbe0;border-radius:6px;padding:12px;'
+       . 'overflow-x:auto;font-size:.78rem;max-height:340px}'
+       . 'button{padding:11px 18px;border:0;border-radius:5px;background:#b42318;color:#fff;'
+       . 'font-size:1rem;font-weight:600;cursor:pointer}'
+       . 'table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #d8dbe0;'
+       . 'border-radius:6px;margin:12px 0}'
+       . 'td{padding:7px 10px;border-top:1px solid #eceef1;font-size:.85rem;vertical-align:top}'
+       . 'td.e{width:70px;font-weight:700;text-align:center}'
+       . '.o{color:#1a7f37}.f{color:#b42318}'
+       . 'code{background:#eceef1;padding:1px 5px;border-radius:3px}'
+       . '.fix{margin:8px 0;padding:10px;background:#f3f4f6;border-radius:4px;'
+       . 'font-family:ui-monospace,Consolas,monospace;font-size:.82rem;white-space:pre-wrap}'
+       . '</style></head><body><main>' . $corps . '</main></body></html>';
+}
+
+// ---------------------------------------------------------------------
+// Garde d'accès
+// ---------------------------------------------------------------------
+if (CLE_ACCES === '') {
+    $suggestion = bin2hex(random_bytes(16));
+    page('Migration — configuration requise',
+        '<h1>Une clé d\'accès est requise</h1>'
+        . '<p>Ouvrez <code>' . htmlspecialchars(basename(__FILE__), ENT_QUOTES, 'UTF-8')
+        . '</code> et remplacez :</p><div class="fix">const CLE_ACCES = \'\';</div>'
+        . '<p>par :</p><div class="fix">const CLE_ACCES = \'' . $suggestion . '\';</div>'
+        . '<div class="box warn">Ce script modifie la structure de la base. '
+        . 'Sans clé, n\'importe qui pourrait le déclencher.</div>', 403);
+    exit;
+}
+
+if (!hash_equals(CLE_ACCES, (string) ($_GET['cle'] ?? ''))) {
+    http_response_code(404);
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Connexion
+// ---------------------------------------------------------------------
+if (!is_file($racine . '/inc_config.php')) {
+    page('Migration', '<h1>Configuration absente</h1>'
+        . '<p>Ce script doit être placé à la racine du site.</p>', 500);
+    exit;
+}
+
+define('DEUS_DAF', true);
+$config = require $racine . '/inc_config.php';
+$GLOBALS['config'] = $config;
+
+try {
+    $sql = new PDO(
+        sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+            $config['db']['host'], (int) $config['db']['port'], $config['db']['name']),
+        $config['db']['user'],
+        $config['db']['password'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES => false]
+    );
+} catch (PDOException $e) {
+    page('Migration', '<h1>Connexion impossible</h1><div class="box ko">'
+        . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</div>', 500);
+    exit;
+}
+
+$h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+// ---------------------------------------------------------------------
+// Choix de la migration
+// ---------------------------------------------------------------------
+$fichiers = glob($racine . '/db/migration-*.sql') ?: [];
+sort($fichiers);
+
+if ($fichiers === []) {
+    page('Migration', '<h1>Aucune migration disponible</h1>'
+        . '<p>Le dossier <code>db/</code> ne contient aucun fichier '
+        . '<code>migration-*.sql</code>.</p>');
+    exit;
+}
+
+$choisi = (string) ($_REQUEST['fichier'] ?? basename($fichiers[0]));
+
+// Le nom vient du client : on ne retient que ce qui existe réellement.
+$chemin = null;
+foreach ($fichiers as $candidat) {
+    if (basename($candidat) === $choisi) {
+        $chemin = $candidat;
+        break;
+    }
+}
+
+if ($chemin === null) {
+    page('Migration', '<h1>Fichier inconnu</h1>', 404);
+    exit;
+}
+
+/**
+ * Découpe un fichier SQL en instructions.
+ * Suffisant pour les migrations de ce projet : commentaires en début de
+ * ligne, aucun point-virgule à l'intérieur d'une chaîne, pas de
+ * procédure stockée ni de DELIMITER.
+ *
+ * @return string[]
+ */
+function decouper_sql(string $contenu): array
+{
+    $lignes = [];
+
+    foreach (preg_split('/\R/', $contenu) ?: [] as $ligne) {
+        $nettoyee = trim($ligne);
+        if ($nettoyee === '' || str_starts_with($nettoyee, '--')) {
+            continue;
+        }
+        $lignes[] = $ligne;
+    }
+
+    $instructions = [];
+
+    foreach (explode(';', implode("\n", $lignes)) as $morceau) {
+        $morceau = trim($morceau);
+        if ($morceau !== '') {
+            $instructions[] = $morceau;
+        }
+    }
+
+    return $instructions;
+}
+
+$contenu      = (string) file_get_contents($chemin);
+$instructions = decouper_sql($contenu);
+
+// ---------------------------------------------------------------------
+// Exécution
+// ---------------------------------------------------------------------
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && hash_equals(CLE_ACCES, (string) ($_POST['confirmation'] ?? ''))) {
+
+    $lignesResultat = '';
+    $echec          = null;
+    $dejaApplique   = false;
+
+    foreach ($instructions as $index => $instruction) {
+        $apercu = mb_substr(preg_replace('/\s+/', ' ', $instruction) ?? '', 0, 110);
+
+        try {
+            $affectees = $sql->exec($instruction);
+            $lignesResultat .= '<tr><td class="e o">OK</td><td>' . $h($apercu)
+                . '</td><td>' . ($affectees !== false ? (int) $affectees . ' ligne(s)' : '') . '</td></tr>';
+        } catch (PDOException $e) {
+            $lignesResultat .= '<tr><td class="e f">ÉCHEC</td><td>' . $h($apercu)
+                . '</td><td class="f">' . $h($e->getMessage()) . '</td></tr>';
+            $echec = $index;
+
+            // Ces codes signalent que l'objet existe déjà : la migration
+            // a donc très probablement déjà été appliquée. Conseiller une
+            // restauration de sauvegarde serait alors une mauvaise idée,
+            // puisque rien n'est cassé.
+            $dejaApplique = in_array((string) ($e->errorInfo[1] ?? ''), [
+                '1050', // table déjà existante
+                '1060', // colonne déjà existante
+                '1061', // index déjà existant
+                '1826', // contrainte de clé étrangère déjà existante
+                '1091', // colonne ou index à supprimer déjà absent
+            ], true);
+
+            break;
+        }
+    }
+
+    if ($echec === null) {
+        $bilan = '<div class="box ok"><strong>Migration appliquée.</strong> '
+            . count($instructions) . ' instruction(s) exécutée(s).</div>';
+    } elseif (!empty($dejaApplique)) {
+        $bilan = '<div class="box warn"><strong>Migration déjà appliquée.</strong> '
+            . 'L\'instruction ' . ($echec + 1) . ' porte sur un objet qui existe déjà. '
+            . 'Aucune donnée n\'a été touchée : il n\'y a rien à faire, et surtout '
+            . 'rien à restaurer.</div>';
+    } else {
+        $bilan = '<div class="box ko"><strong>Arrêt à l\'instruction ' . ($echec + 1) . '.</strong> '
+            . 'Les instructions précédentes ont été appliquées : la base est dans un état '
+            . 'intermédiaire. MySQL ne sait pas annuler une modification de structure, '
+            . 'restaurez votre sauvegarde avant de réessayer.</div>';
+    }
+
+    page('Migration — ' . $choisi,
+        '<h1>' . $h($choisi) . '</h1>' . $bilan
+        . '<table>' . $lignesResultat . '</table>'
+        . '<div class="box warn"><strong>À faire maintenant :</strong> supprimer le fichier '
+        . '<code>' . $h(basename(__FILE__)) . '</code> du serveur.</div>');
+    exit;
+}
+
+// ---------------------------------------------------------------------
+// Aperçu avant exécution
+// ---------------------------------------------------------------------
+$liste = '';
+foreach ($fichiers as $candidat) {
+    $nom = basename($candidat);
+    $liste .= '<li>' . ($nom === $choisi ? '<strong>' . $h($nom) . '</strong>' : $h($nom)) . '</li>';
+}
+
+page('Migration — ' . $choisi,
+    '<h1>Appliquer une migration</h1>'
+    . '<div class="box warn"><strong>Sauvegardez la base avant de continuer.</strong> '
+    . 'Une migration modifie la structure et peut supprimer des colonnes. '
+    . 'MySQL ne sait pas annuler ces opérations.</div>'
+    . '<h2>Fichiers présents</h2><ul>' . $liste . '</ul>'
+    . '<h2>' . count($instructions) . ' instruction(s) à exécuter</h2>'
+    . '<pre>' . $h($contenu) . '</pre>'
+    . '<form method="post">'
+    . '<input type="hidden" name="fichier" value="' . $h($choisi) . '">'
+    . '<input type="hidden" name="confirmation" value="' . $h(CLE_ACCES) . '">'
+    . '<button type="submit">Appliquer cette migration</button>'
+    . '</form>');
