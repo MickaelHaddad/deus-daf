@@ -39,6 +39,13 @@ Options -Indexes
     # redirection HTTPS pour bloquer sans aller-retour inutile.
     RewriteRule ^(storage|db|bin|deploy)(/|$) - [F,L]
 
+    # Tout chemin contenant un élément commençant par un point.
+    # INDISPENSABLE : le bloc <FilesMatch "^\."> plus bas ne s'applique
+    # qu'au NOM DE FICHIER, pas au chemin. Sans cette règle, un dépôt
+    # .git téléversé par mégarde servirait .git/config et .git/HEAD en
+    # clair — et de là, tout l'historique du code et ses secrets.
+    RewriteRule (^|/)\. - [F,L]
+
     # On ne redirige pas si la requête est déjà en HTTPS, y compris
     # derrière un proxy inverse ou un répartiteur de charge.
     # Chaque condition doit être fausse pour que la redirection ait lieu.
@@ -67,8 +74,10 @@ Options -Indexes
 </FilesMatch>
 
 # ---------------------------------------------------------------------
-# Fichiers cachés : .git, .gitignore, .htaccess, .env…
+# Fichiers cachés : .gitignore, .htaccess, .env…
 # ---------------------------------------------------------------------
+# Complète la règle de réécriture ci-dessus, qui couvre elle les
+# DOSSIERS cachés. Ce bloc reste utile si mod_rewrite est absent.
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
