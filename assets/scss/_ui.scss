@@ -1,0 +1,267 @@
+ /**** ICONS ****/
+ [class^="icon-"]:before, [class*=" icon-"]:before {
+  font-family: "icons";
+  font-style: normal;
+  font-weight: normal;
+  speak: never;
+ 
+  display: inline-block;
+  text-decoration: inherit;
+  min-width: 1em;
+  /*margin-right: .2em;*/
+  text-align: center;
+  /* opacity: .8; */
+ 
+  /* For safety - reset parent styles, that can break glyph codes*/
+  font-variant: normal;
+  text-transform: none;
+ 
+  /* fix buttons height, for twitter bootstrap */
+  line-height: 1em;
+ 
+  /* Animation center compensation - margins should be symmetric */
+  /* remove if not needed */
+  /*margin-left: .2em;*/
+ 
+  /* you can be more comfortable with increased icons size */
+  /* font-size: 120%; */
+ 
+  /* Font smoothing. That was taken from TWBS */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+ 
+  /* Uncomment for 3D effect */
+  /* text-shadow: 1px 1px 1px rgba(127, 127, 127, 0.3); */
+}
+/**** /ICONS ****/
+
+/**** FORMS ****/
+.form-control, .form-select, .easy-autocomplete input {
+	caret-color: var(--bs-primary);
+}
+input[type="date"][placeholder]:not([placeholder=""])::before {
+  content: attr(placeholder) " : ";
+  white-space: pre;
+}
+input[type="date"]:focus::before,
+input[type="date"]:valid::before {
+  content: ""!important;
+}
+input.form-control-color+.input-group-text {
+  font-family: monospace;
+  text-align: left;
+  max-width: 94px;
+}
+.form-control:disabled {
+  opacity: 0.5;
+}
+/**** /FORMS ****/
+
+/**** BUTTON ****/
+.btn {
+  position: relative;
+  .badge.pastille {
+    --bs-bg-opacity: 1;
+    border-radius: var(--bs-border-radius-pill);
+    background-color: rgba(var(--bs-danger-rgb), var(--bs-bg-opacity));
+    transform: translate(-50%, -50%);
+    left: calc(100% - 4px);
+    top: 4px;
+    position: absolute;
+  }
+}
+.btn-action {
+  width: 35px;
+  min-width: 35px;
+  height: 35px;
+  min-height: 35px;
+  border-radius: var(--bs-border-radius);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  margin: 2px 0px;
+  color: var(--bs-body-color);
+  background: var(--bs-secondary-bg);
+  outline: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  &:hover, &.selected {
+    background-color: var(--bs-primary);
+    color: var(--bs-white);
+  }
+}
+.btn[data-bs-toggle=button]:not(.active):not(:hover) {
+  background-color: transparent;
+}
+/**** BUTTON ****/
+
+/**** DROPDOWN ****/
+.dropdown-menu .dropdown-menu {
+  left: 100%;
+  top: 0;
+  margin-left: 0.1rem;
+  margin-top: -0.25rem;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+  @media screen and (min-width: 768px) {
+    position: absolute;
+  }
+}
+.dropdown-submenu {
+  position: relative;
+}
+/**** /DROPDOWN ****/
+
+/**** SUMMERNOTE ****/
+.note-editor {
+  border-radius: var(--bs-border-radius);
+  border: 1px solid var(--bs-border-color) !important;
+
+  &:not(.fullscreen) .note-toolbar {
+    position: sticky;
+    top: var(--header-height);
+  }
+  .note-toolbar {
+    border-bottom: 1px solid var(--bs-border-color) !important;
+    background: var(--bs-secondary-bg);
+    z-index: 1;
+    border-top-left-radius: var(--bs-border-radius);
+    border-top-right-radius: var(--bs-border-radius);
+    .note-btn {
+      background: var(--bs-body-bg);
+      border-color: var(--bs-border-color) !important;
+      color: var(--bs-body-color);
+    }
+    a.note-dropdown-item,
+    a.note-dropdown-item:hover {
+      color: inherit;
+    }
+  }
+  .note-editing-area {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+  }
+  .note-editable {
+    caret-color: var(--bs-primary);
+    min-height: 200px;
+  }
+  .dropdown-toggle::after {
+    all: unset;
+  }
+  .note-dropdown-menu {
+    box-sizing: content-box;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+  }
+  .note-modal-footer {
+    box-sizing: content-box;
+  }
+  ul.note-dropdown-menu.dropdown-menu {
+    padding-left: 7px;
+    text-decoration: none;
+    a {
+      text-decoration: none;
+    }
+  }
+}
+/**** /SUMMERNOTE ****/
+
+/**** TOAST ****/
+.toast {
+  position: fixed;
+  display: flex;
+  width: fit-content;
+  max-width: 410px;
+  min-height: 75px;
+  padding: 10px 25px;
+  top: 45px;
+  left: 0;
+  right: 0;
+  margin: auto;
+  opacity: 1;
+  overflow: hidden;
+  background: var(--bs-tertiary-bg);
+  box-shadow: 0 .125rem .25rem rgba(var(--bs-body-color-rgb),.075)!important;
+  border-radius: 50px;
+  transition: all .5s;
+  z-index: 9999999;
+  color: var(--bs-body-color);
+  font-size: var(--font-size-md);
+  line-height: 1.2;
+  font-weight: 700;
+  &.toast-hide {
+    opacity: 0;
+    transition: all 0.5s;
+  }
+  .toast-container {
+    display: flex;
+    align-items: center;
+    i {
+      font-size: 33px;
+      margin-right: 22px;
+    }
+  }
+}
+@media (max-width: 560px) {
+  .toast {
+    margin: auto 15px;
+    padding: 15px 15px;
+    font-size: var(--font-size-rg);
+    .toast-container {
+      i {
+        font-size: 22px;
+        margin-right: 15px;
+      }
+    }
+  }
+}
+/**** /TOAST ****/
+
+/**** TOM SELECT ****/
+.ts-no-pastille {
+  + .ts-wrapper {
+    .ts-control {
+      padding: .375rem .75rem!important;
+      &.placeholder::before {
+        content: attr(data-placeholder);
+        color: var(--bs-body-color);
+        pointer-events: none;
+      }
+      .item, input[type=text] {
+        display: none !important;
+      }
+  }
+    .ts-dropdown {
+      width: auto;
+      white-space: nowrap;
+      color: var(--bs-body-color);
+    }
+  }
+}
+/**** /TOM SELECT ****/
+
+/**** FILEPOND ****/
+.filepond--root {
+  margin-bottom: 0;
+  .filepond--drop-label {
+    color: var(--bs-body-color);
+  }
+  .filepond--panel-root {
+    background-color: var(--bs-secondary-bg);
+  }
+  .filepond--credits { display: none; }
+  &.is-invalid .filepond--drop-label {
+    border: 1px solid var(--bs-form-invalid-color);
+    border-radius: var(--bs-border-radius);
+  }
+  &.is-valid .filepond--panel {
+    border: 1px solid var(--bs-form-valid-color)!important;
+    border-radius: var(--bs-border-radius);
+    height: calc(100% + 2px)!important;
+  }
+}
+/**** /FILEPOND ****/

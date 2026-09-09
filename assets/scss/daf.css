@@ -1,0 +1,242 @@
+/* =====================================================================
+   daf.css — styles propres à deus-daf
+   ---------------------------------------------------------------------
+   Complète custom.min.css (Bootstrap) et main.min.css (layout repris de
+   deus-console). Toutes les couleurs passent par les variables
+   Bootstrap --bs-* : le thème sombre est donc géré sans règle dédiée.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Écran de connexion : plein écran, sans en-tête
+   --------------------------------------------------------------------- */
+#page-wrapper.no-header {
+    padding-top: 0;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    padding: 32px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .08);
+}
+
+[data-bs-theme="dark"] .login-card {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .45);
+}
+
+.login-logo {
+    font-size: 2.25rem;
+    color: var(--bs-primary);
+}
+
+/* ---------------------------------------------------------------------
+   Indicateurs chiffrés du tableau de bord
+   --------------------------------------------------------------------- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.kpi {
+    background: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    padding: 16px 18px;
+}
+
+.kpi-label {
+    font-size: var(--font-size-xsm);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 4px;
+}
+
+.kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.kpi-hint {
+    font-size: var(--font-size-xsm);
+    color: var(--bs-secondary-color);
+}
+
+/* ---------------------------------------------------------------------
+   Bloc d'alertes
+   --------------------------------------------------------------------- */
+.alert-block {
+    border-left: 4px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-secondary-bg);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.alert-block.level-critical { border-left-color: var(--bs-danger); }
+.alert-block.level-warning  { border-left-color: var(--bs-warning); }
+.alert-block.level-info     { border-left-color: var(--bs-info); }
+
+.alert-block .alert-title {
+    font-weight: 700;
+    font-size: var(--font-size-rg);
+    margin-bottom: 2px;
+}
+
+.alert-block .alert-meta {
+    font-size: var(--font-size-xsm);
+    color: var(--bs-secondary-color);
+}
+
+.alert-services {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+    font-size: var(--font-size-sm);
+}
+
+.alert-services li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+/* ---------------------------------------------------------------------
+   Vignettes de cartes bancaires
+   --------------------------------------------------------------------- */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.card-tile {
+    background: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.card-tile.is-expired   { border-color: var(--bs-danger); }
+.card-tile.is-expiring  { border-color: var(--bs-warning); }
+.card-tile.is-cancelled { opacity: .6; }
+
+.card-number {
+    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    font-size: 1.1rem;
+    letter-spacing: .08em;
+}
+
+.card-figures {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: var(--font-size-sm);
+    border-top: 1px solid var(--bs-border-color);
+    padding-top: 10px;
+}
+
+/* ---------------------------------------------------------------------
+   Répartition en barres, sans librairie de graphiques
+   --------------------------------------------------------------------- */
+.breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.breakdown-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 1fr) 2fr auto;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--font-size-sm);
+}
+
+.breakdown-track {
+    background: var(--bs-tertiary-bg);
+    border-radius: 999px;
+    height: 10px;
+    overflow: hidden;
+}
+
+.breakdown-bar {
+    display: block;
+    height: 100%;
+    width: var(--bar-width, 0%);
+    background: var(--bs-primary);
+    border-radius: 999px;
+    transition: width .3s ease;
+}
+
+/* ---------------------------------------------------------------------
+   Tableaux denses
+   --------------------------------------------------------------------- */
+table.dataTable td,
+table.dataTable th {
+    vertical-align: middle;
+}
+
+.table-totals {
+    font-size: var(--font-size-sm);
+    color: var(--bs-secondary-color);
+}
+
+/* Signalement d'un service payé par une carte expirée */
+.icon-alert {
+    color: var(--bs-danger);
+    cursor: help;
+}
+
+/* ---------------------------------------------------------------------
+   Champ MM/AA
+   --------------------------------------------------------------------- */
+.input-expiry {
+    max-width: 120px;
+    font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+    letter-spacing: .1em;
+}
+
+/* ---------------------------------------------------------------------
+   Divers
+   --------------------------------------------------------------------- */
+.empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--bs-secondary-color);
+}
+
+.empty-state i {
+    font-size: 2.5rem;
+    opacity: .35;
+    margin-bottom: 12px;
+}
+
+/* Le focus clavier doit rester parfaitement visible dans les deux thèmes. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+}

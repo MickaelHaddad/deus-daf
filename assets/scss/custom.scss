@@ -1,0 +1,93 @@
+// Custom.scss
+// Option B: Include parts of Bootstrap
+
+// 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
+@import "../bootstrap-5.3.6/scss/functions";
+
+// 2. Include any default variable overrides here
+$primary: #007AFF;
+//$secondary: #e9ecef;
+$success: #3D9400;
+$danger: #d9534f;
+$warning: #f0ad4e;
+$info: #455BED;
+//NAVBAR
+$navbar-light-active-color: var(--bs-primary);
+//OFFCANVAS
+$offcanvas-horizontal-width: 300px;
+//FORMS
+//$input-font-size: var(--font-size-sm);
+//$input-border-radius: 30px;
+$input-placeholder-color: #999;
+
+// 3. Include remainder of required Bootstrap stylesheets (including any separate color mode stylesheets)
+@import "../bootstrap-5.3.6/scss/variables";
+@import "../bootstrap-5.3.6/scss/variables-dark";
+
+// 4. Include any default map overrides here
+
+// 5. Include remainder of required parts
+@import "../bootstrap-5.3.6/scss/maps";
+@import "../bootstrap-5.3.6/scss/mixins";
+@import "../bootstrap-5.3.6/scss/root";
+
+// 6. Optionally include any other parts as needed
+@import "../bootstrap-5.3.6/scss/utilities";
+@import "../bootstrap-5.3.6/scss/reboot";
+@import "../bootstrap-5.3.6/scss/type";
+@import "../bootstrap-5.3.6/scss/images";
+@import "../bootstrap-5.3.6/scss/containers";
+@import "../bootstrap-5.3.6/scss/grid";
+@import "../bootstrap-5.3.6/scss/helpers";
+
+//Components
+@import "../bootstrap-5.3.6/scss/forms";
+@import "../bootstrap-5.3.6/scss/buttons";
+@import "../bootstrap-5.3.6/scss/transitions";
+@import "../bootstrap-5.3.6/scss/dropdown";
+@import "../bootstrap-5.3.6/scss/button-group";
+@import "../bootstrap-5.3.6/scss/nav";
+@import "../bootstrap-5.3.6/scss/navbar";
+@import "../bootstrap-5.3.6/scss/card";
+@import "../bootstrap-5.3.6/scss/tables";
+@import "../bootstrap-5.3.6/scss/accordion";
+@import "../bootstrap-5.3.6/scss/breadcrumb";
+@import "../bootstrap-5.3.6/scss/pagination";
+@import "../bootstrap-5.3.6/scss/badge";
+@import "../bootstrap-5.3.6/scss/alert";
+@import "../bootstrap-5.3.6/scss/progress";
+@import "../bootstrap-5.3.6/scss/list-group";
+@import "../bootstrap-5.3.6/scss/close";
+//@import "../bootstrap-5.3.6/scss/toasts";
+@import "../bootstrap-5.3.6/scss/modal";
+@import "../bootstrap-5.3.6/scss/tooltip";
+@import "../bootstrap-5.3.6/scss/popover";
+//@import "../bootstrap-5.3.6/scss/carousel";
+//@import "../bootstrap-5.3.6/scss/spinners";
+@import "../bootstrap-5.3.6/scss/offcanvas";
+//@import "../bootstrap-5.3.6/scss/placeholders";
+//Components
+
+// 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
+@import "../bootstrap-5.3.6/scss/utilities/api";
+
+// 8. Add additional custom code here
+.text-bg- {
+    &primary,
+    &secondary,
+    &success,
+    &danger,
+    &warning,
+    &info,
+    &other {
+        color: var(--bs-white) !important;
+    }
+}
+.btn-success {
+    --bs-btn-color: var(--bs-white);
+}
+html[data-bs-theme="dark"] {
+    .btn-dark {
+        --bs-btn-bg: var(--bs-black);
+    }
+}

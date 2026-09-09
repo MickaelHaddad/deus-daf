@@ -1,0 +1,179 @@
+# =====================================================================
+#  deus-daf — vhost Nginx
+# =====================================================================
+#  À copier dans /etc/nginx/sites-available/daf.exemple.fr puis :
+#      ln -s /etc/nginx/sites-available/daf.exemple.fr \
+#            /etc/nginx/sites-enabled/
+#      nginx -t && systemctl reload nginx
+#
+#  Remplacer partout :
+#      daf.exemple.fr       → votre nom de domaine
+#      /var/www/deus-daf    → le chemin d'installation
+#      php8.2-fpm.sock      → la version de PHP-FPM installée
+#
+#  ⚠️  POINT CRITIQUE : Nginx N'INTERPRÈTE PAS les fichiers .htaccess.
+#  Les blocages présents dans le dépôt sous forme de .htaccess sont un
+#  simple repli pour Apache et ne protègent RIEN ici. Sans les blocs
+#  « location » ci-dessous, db/seed.sql et storage/logs/php-error.log
+#  seraient servis en clair sur Internet.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# HTTP : redirection permanente vers HTTPS
+# ---------------------------------------------------------------------
+server {
+    listen      80;
+    listen      [::]:80;
+    server_name daf.exemple.fr;
+
+    # Laisser passer la validation Let's Encrypt.
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---------------------------------------------------------------------
+# HTTPS : le vhost applicatif
+# ---------------------------------------------------------------------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name daf.exemple.fr;
+
+    root  /var/www/deus-daf;
+    index index.php;
+
+    # -----------------------------------------------------------------
+    # TLS — chemins produits par certbot
+    # -----------------------------------------------------------------
+    ssl_certificate     /etc/letsencrypt/live/daf.exemple.fr/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/daf.exemple.fr/privkey.pem;
+
+    ssl_protocols             TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache         shared:SSL:10m;
+    ssl_session_timeout       1d;
+    ssl_session_tickets       off;
+    ssl_stapling              on;
+    ssl_stapling_verify       on;
+
+    # -----------------------------------------------------------------
+    # Journalisation
+    # -----------------------------------------------------------------
+    access_log /var/log/nginx/deus-daf.access.log;
+    error_log  /var/log/nginx/deus-daf.error.log;
+
+    # -----------------------------------------------------------------
+    # Réglages généraux
+    # -----------------------------------------------------------------
+    # Aucun téléversement dans cette application : 1 Mo suffit largement
+    # et limite la surface d'attaque.
+    client_max_body_size 1m;
+
+    # Ne pas annoncer la version de Nginx.
+    server_tokens off;
+
+    gzip              on;
+    gzip_vary         on;
+    gzip_min_length   1024;
+    gzip_types        text/plain text/css application/javascript application/json
+                      image/svg+xml font/woff2;
+
+    # -----------------------------------------------------------------
+    # En-têtes de sécurité
+    # -----------------------------------------------------------------
+    # La Content-Security-Policy est émise par PHP : elle contient un
+    # nonce recalculé à chaque requête et ne peut donc pas être figée
+    # ici. Les en-têtes ci-dessous couvrent aussi les fichiers statiques.
+    add_header X-Content-Type-Options "nosniff"                      always;
+    add_header X-Frame-Options        "DENY"                         always;
+    add_header Referrer-Policy        "same-origin"                  always;
+    add_header Strict-Transport-Security
+               "max-age=31536000; includeSubDomains"                 always;
+
+    # =================================================================
+    #  BLOCAGES — ces blocs doivent précéder le traitement PHP.
+    #  Nginx retient la PREMIÈRE expression régulière qui correspond,
+    #  dans l'ordre de déclaration du fichier : ne pas les déplacer.
+    # =================================================================
+
+    # Dossiers applicatifs : schéma SQL, jeu de démonstration, journaux,
+    # sessions, scripts CLI, exemples de configuration serveur.
+    location ~ ^/(db|storage|bin|deploy)/ {
+        deny all;
+        return 404;
+    }
+
+    # Includes : jamais appelés directement. Le code PHP se défend déjà
+    # tout seul, ceci en est la deuxième barrière.
+    location ~ ^/inc_ {
+        deny all;
+        return 404;
+    }
+
+    # Fichiers cachés : .git, .gitignore, .htaccess, .env…
+    location ~ /\. {
+        deny all;
+        return 404;
+    }
+
+    # Extensions qui n'ont rien à faire sur le web.
+    location ~* \.(sql|log|md|sample|bak|dist|ini|sh|lock)$ {
+        deny all;
+        return 404;
+    }
+
+    # =================================================================
+    #  CONTENU
+    # =================================================================
+
+    # Assets statiques : cache long, aucune exécution possible.
+    location ^~ /assets/ {
+        access_log off;
+        expires    30d;
+        add_header Cache-Control "public, immutable";
+        try_files  $uri =404;
+    }
+
+    # Polices : autorisées uniquement depuis cette origine.
+    location ~* \.(woff2?|ttf|eot|svg)$ {
+        access_log off;
+        expires    1y;
+        add_header Cache-Control "public, immutable";
+        try_files  $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # -----------------------------------------------------------------
+    # PHP
+    # -----------------------------------------------------------------
+    location ~ \.php$ {
+        # « try_files $uri =404 » est INDISPENSABLE : sans lui, une URL
+        # du type /assets/logo.png/x.php serait transmise à PHP, qui
+        # exécuterait le fichier image. C'est la faille classique des
+        # configurations Nginx + PHP-FPM.
+        try_files $uri =404;
+
+        include        fastcgi_params;
+        fastcgi_pass   unix:/run/php/php8.2-fpm.sock;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+        # PATH_INFO désactivé : l'application n'en a aucun usage et il
+        # ouvre la porte au contournement décrit ci-dessus.
+        fastcgi_split_path_info ^(.+\.php)(/.*)$;
+        fastcgi_param  PATH_INFO "";
+
+        fastcgi_read_timeout 60s;
+        fastcgi_hide_header  X-Powered-By;
+    }
+}
