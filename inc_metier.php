@@ -33,11 +33,12 @@ if (!defined('DEUS_DAF')) {
 function companies(): array
 {
     return [
-        'deus_communications' => 'Deus Communications',
+        'deus_communications' => 'Deus Communication',
         'sued'                => 'Sued',
         'pastel_services'     => 'Pastel Services',
     ];
 }
+
 
 /** Libellé d'une société, ou la clé brute si elle n'est plus connue. */
 function company_label(?string $key): string
