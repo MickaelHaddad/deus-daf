@@ -26,7 +26,7 @@ if (!$page_publique) {
     require_login();
 }
 
-$title          = $title   ?? ($config['app']['name'] ?? 'Deus DAF');
+$title          = $title   ?? ($config['app']['name'] ?? 'Suivi CB');
 $page_id        = $page_id ?? 'page';
 $menu           = $menu    ?? '';
 $includePlugins = $includePlugins ?? [];

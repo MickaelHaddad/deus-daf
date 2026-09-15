@@ -63,7 +63,7 @@ function ask_hidden(string $question): string
 
 echo "\n";
 echo "==========================================================\n";
-echo "  Deus DAF — création du premier compte administrateur\n";
+echo "  Suivi CB — création du premier compte administrateur\n";
 echo "==========================================================\n\n";
 
 // ---------------------------------------------------------------------

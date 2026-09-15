@@ -27,10 +27,11 @@ $creation = $service === null;
 // Cartes proposées : toutes sauf les résiliées, plus la carte
 // actuellement rattachée même si elle est résiliée ou expirée.
 $stmt = $sql->prepare(
-    "SELECT id, label, last4, status, expires_on
-       FROM fi_cards
-      WHERE status = 'active' OR id = ?
-      ORDER BY label"
+    "SELECT c.id, c.label, c.last4, c.status, c.expires_on, b.company
+       FROM fi_cards c
+       JOIN fi_banks b ON b.id = c.bank_id
+      WHERE c.status = 'active' OR c.id = ?
+      ORDER BY c.label"
 );
 $stmt->execute([$creation ? 0 : (int) ($service['card_id'] ?? 0)]);
 $cartes = $stmt->fetchAll();
@@ -132,7 +133,7 @@ $referents = $stmt->fetchAll();
 ?>
                                 <option value="<?= (int) $c['id'] ?>"
                                     <?= (int) ($service['card_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>>
-                                    <?= h((string) $c['label']) ?> ••••<?= h((string) $c['last4']) ?><?= h($suffixe) ?>
+                                    <?= h((string) $c['label']) ?> ••••<?= h((string) $c['last4']) ?> (<?= h(company_label((string) $c['company'])) ?>)<?= h($suffixe) ?>
                                 </option>
 <?php } ?>
                             </select>

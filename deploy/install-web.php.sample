@@ -234,4 +234,4 @@ $corps = '<h1>Premier compte administrateur</h1>'
     . '<button type="submit">Créer le compte administrateur</button>'
     . '</form>';
 
-page('Premier compte administrateur — Deus DAF', $corps);
+page('Premier compte administrateur — Suivi CB', $corps);

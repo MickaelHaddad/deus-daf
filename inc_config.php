@@ -20,7 +20,7 @@ return [
         'password' => '.OXjhN]FG(cv_4Fc',
     ],
     'app' => [
-        'name'     => 'Deus DAF',
+        'name'     => 'Suivi CB',
         'company'  => 'Deus',
         'base_url' => 'https://gc-compta.syntencloud.com',
         'timezone' => 'Europe/Paris',
@@ -44,7 +44,7 @@ return [
     'mail' => [
         'enabled'          => false,
         'from'             => 'daf@exemple.fr',
-        'from_name'        => 'Deus DAF',
+        'from_name'        => 'Suivi CB',
         'admin_recipients' => [],
     ],
 ];

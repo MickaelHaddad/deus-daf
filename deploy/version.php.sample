@@ -59,7 +59,7 @@ echo '<div class="v">PHP ' . htmlspecialchars($version) . '</div>';
 
 if (!$suffisant) {
     echo '<div class="box ko"><strong>C\'est la cause de l\'erreur 500.</strong><br>';
-    echo 'Deus DAF exige <strong>PHP 8.0 minimum</strong> (8.2 recommandé). ';
+    echo 'Suivi CB exige <strong>PHP 8.0 minimum</strong> (8.2 recommandé). ';
     echo 'Sur cette version, plusieurs fichiers de l\'application ne peuvent même pas ';
     echo 'être analysés : PHP s\'arrête avant d\'exécuter la moindre ligne, ce qui ';
     echo 'produit une page 500 sans aucun message.<br><br>';

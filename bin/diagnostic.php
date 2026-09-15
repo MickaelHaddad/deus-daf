@@ -32,7 +32,7 @@ $resultat = collect_diagnostic($racine);
 
 echo "\n";
 echo "======================================================================\n";
-echo "  Deus DAF — diagnostic d'installation\n";
+echo "  Suivi CB — diagnostic d'installation\n";
 echo '  ' . date('Y-m-d H:i:s') . ' — ' . $racine . "\n";
 echo "======================================================================\n";
 

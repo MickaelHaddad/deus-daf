@@ -44,7 +44,7 @@ if ($action === 'out') {
     $noticeType = 'warning';
 }
 
-$title         = 'Connexion — ' . ($config['app']['name'] ?? 'Deus DAF');
+$title         = 'Connexion — ' . ($config['app']['name'] ?? 'Suivi CB');
 $page_id       = 'page_connexion';
 $sans_menu     = true;
 $page_publique = true;
@@ -55,7 +55,7 @@ include __DIR__ . '/inc_header.php';
             <div class="login-card">
                 <div class="text-center mb-4">
                     <i class="fa-solid fa-credit-card login-logo" aria-hidden="true"></i>
-                    <h1 class="h4 mt-3 mb-1"><?= h($config['app']['name'] ?? 'Deus DAF') ?></h1>
+                    <h1 class="h4 mt-3 mb-1"><?= h($config['app']['name'] ?? 'Suivi CB') ?></h1>
                     <p class="text-secondary text-sm mb-0">Suivi des cartes et des abonnements</p>
                 </div>
 

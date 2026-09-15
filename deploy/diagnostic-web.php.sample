@@ -126,7 +126,7 @@ $resultat = collect_diagnostic($racine);
 // ---------------------------------------------------------------------
 $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-$corps = '<h1>Deus DAF — diagnostic d\'installation</h1>'
+$corps = '<h1>Suivi CB — diagnostic d\'installation</h1>'
     . '<p class="meta">' . $h(date('d/m/Y H:i:s')) . ' — ' . $h($racine)
     . ' — PHP ' . $h(PHP_VERSION) . ' (' . $h(PHP_SAPI) . ')</p>';
 
@@ -167,4 +167,4 @@ $corps .= '<div class="rappel"><strong>À faire maintenant :</strong> supprimer 
     . '(<code>' . $h(basename(__FILE__)) . '</code>) du serveur. Il expose la structure de '
     . 'votre installation et l\'état de la base.</div>';
 
-page('Diagnostic — Deus DAF', $corps);
+page('Diagnostic — Suivi CB', $corps);

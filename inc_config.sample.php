@@ -47,7 +47,7 @@ return [
     // -----------------------------------------------------------------
     'app' => [
         // Nom affiché dans le menu et le titre du navigateur.
-        'name' => 'Deus DAF',
+        'name' => 'Suivi CB',
 
         // Nom de la structure, affiché dans le pied de page.
         'company' => 'Deus',
@@ -130,7 +130,7 @@ return [
     'mail' => [
         'enabled'   => false,
         'from'      => 'daf@exemple.fr',
-        'from_name' => 'Deus DAF',
+        'from_name' => 'Suivi CB',
         // Destinataires en copie des alertes, en plus du titulaire de
         // la carte concernée.
         'admin_recipients' => [],

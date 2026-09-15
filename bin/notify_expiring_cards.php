@@ -87,7 +87,7 @@ foreach ($aEnvoyer as $alerte) {
 // ---------------------------------------------------------------------
 $baseUrl     = rtrim((string) ($config['app']['base_url'] ?? ''), '/');
 $expediteur  = (string) ($config['mail']['from'] ?? 'no-reply@localhost');
-$nomExp      = (string) ($config['mail']['from_name'] ?? 'Deus DAF');
+$nomExp      = (string) ($config['mail']['from_name'] ?? 'Suivi CB');
 $copies      = (array) ($config['mail']['admin_recipients'] ?? []);
 $envoyes     = 0;
 

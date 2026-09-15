@@ -1,4 +1,4 @@
-# Deus DAF
+# Suivi CB
 
 Back office interne de suivi des cartes bancaires et des abonnements.
 Il répond à une question simple : **qui paie quoi, avec quelle carte,
